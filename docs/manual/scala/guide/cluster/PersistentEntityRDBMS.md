@@ -61,3 +61,16 @@ The database schemas needed for the tables can be found [here](https://github.co
 The full configuration options that Lagom provides for managing the creation of tables is here:
 
 @[persistence](../../../../../persistence-jdbc/core/src/main/resources/reference.conf)
+
+## Application Loader
+
+Your Lagom Application Loader will by default load the Cassandra persistence components. For an RDBMS not only the JDBC persistence components must be loaded but also a connection pool must be configured. By default the Hikari connection pool is available in Play and can be configured as follows:
+
+```
+abstract class BlogApplication(context: LagomApplicationContext)
+  extends LagomApplication(context)
+    with JdbcPersistenceComponents
+    with HikariCPComponents
+    with AhcWSComponents {
+```
+
