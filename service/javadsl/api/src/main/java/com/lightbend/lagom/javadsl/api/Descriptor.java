@@ -118,7 +118,7 @@ public final class Descriptor {
         public Optional<CircuitBreaker> circuitBreaker() {
           return circuitBreaker;
         }
-    
+
         /**
          * Whether this service call should automatically define an ACL for the router to route external calls to it.
          *
@@ -152,7 +152,7 @@ public final class Descriptor {
             return new Call<>(callId, serviceCallHolder, requestSerializer, responseSerializer, circuitBreaker,
                     autoAcl);
         }
-    
+
         /**
          * Return a copy of this call descriptor with the given request message
          * serializer configured.
@@ -165,7 +165,7 @@ public final class Descriptor {
             return new Call<>(callId, serviceCallHolder, requestSerializer, responseSerializer, circuitBreaker,
                     autoAcl);
         }
-    
+
         /**
          * Return a copy of this call descriptor with the given response message
          * serializer configured.
@@ -569,7 +569,7 @@ public final class Descriptor {
 
     Descriptor(String name, PSequence<Call<?, ?>> calls, PMap<Type, PathParamSerializer<?>> pathParamSerializers,
             PMap<Type, MessageSerializer<?, ?>> messageSerializers, SerializerFactory serializerFactory,
-            ExceptionSerializer exceptionSerializer, boolean autoAcl, PSequence<ServiceAcl> acls, 
+            ExceptionSerializer exceptionSerializer, boolean autoAcl, PSequence<ServiceAcl> acls,
             HeaderFilter headerFilter, boolean locatableService, CircuitBreaker circuitBreaker, PSequence<TopicCall<?>> topicCalls) {
         this.name = name;
         this.calls = calls;
@@ -629,7 +629,7 @@ public final class Descriptor {
     public HeaderFilter headerFilter() {
         return headerFilter;
     }
-    
+
     /**
      * Whether this is a locatable service.
      *
@@ -852,9 +852,22 @@ public final class Descriptor {
      *
      * @param topicCalls The topic calls to add.
      * @return A copy of this descriptor with the new calls added.
+     *
+     * @deprecated use {@link Descriptor#withTopics(TopicCall[])} instead.
      */
+    @Deprecated
     public Descriptor publishing(TopicCall<?>... topicCalls) {
-      return new Descriptor(name, calls, pathParamSerializers, messageSerializers, serializerFactory, exceptionSerializer, autoAcl, acls, headerFilter, locatableService, circuitBreaker,
-          this.topicCalls.plusAll(Arrays.asList(topicCalls)));
+      return withTopics(topicCalls);
+    }
+
+    /**
+     * Add the given topic calls to this service.
+     *
+     * @param topicCalls The topic calls to add.
+     * @return A copy of this descriptor with the new calls added.
+     */
+    public Descriptor withTopics(TopicCall<?>... topicCalls) {
+        return new Descriptor(name, calls, pathParamSerializers, messageSerializers, serializerFactory, exceptionSerializer, autoAcl, acls, headerFilter, locatableService, circuitBreaker,
+                this.topicCalls.plusAll(Arrays.asList(topicCalls)));
     }
 }

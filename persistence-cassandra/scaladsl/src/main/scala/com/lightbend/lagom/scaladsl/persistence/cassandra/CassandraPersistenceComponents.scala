@@ -3,18 +3,14 @@
  */
 package com.lightbend.lagom.scaladsl.persistence.cassandra
 
-import com.lightbend.lagom.internal.persistence.cassandra.ServiceLocatorHolder
-import com.lightbend.lagom.internal.persistence.cassandra.ServiceLocatorAdapter
-
 import scala.concurrent.Future
 import java.net.URI
 
-import com.lightbend.lagom.internal.persistence.cassandra.CassandraOffsetStore
 import com.lightbend.lagom.internal.scaladsl.persistence.cassandra.{ CassandraPersistentEntityRegistry, CassandraReadSideImpl, ScaladslCassandraOffsetStore }
 import com.lightbend.lagom.scaladsl.api.ServiceLocator
 import com.lightbend.lagom.scaladsl.persistence.{ PersistenceComponents, PersistentEntityRegistry, ReadSidePersistenceComponents, WriteSidePersistenceComponents }
+import com.lightbend.lagom.internal.persistence.cassandra.{ CassandraReadSideSettings, CassandraOffsetStore, ServiceLocatorAdapter, ServiceLocatorHolder }
 import com.lightbend.lagom.spi.persistence.OffsetStore
-
 /**
  * Persistence Cassandra components (for compile-time injection).
  */
@@ -35,7 +31,8 @@ trait WriteSideCassandraPersistenceComponents extends WriteSidePersistenceCompon
   private[lagom] val serviceLocatorHolder: ServiceLocatorHolder = {
     val holder = ServiceLocatorHolder(actorSystem)
     holder.setServiceLocator(new ServiceLocatorAdapter {
-      override def locate(name: String): Future[Option[URI]] = serviceLocator.locate(name)
+      override def locateAll(name: String): Future[List[URI]] =
+        serviceLocator.locateAll(name)
     })
     holder
   }
@@ -47,9 +44,10 @@ trait WriteSideCassandraPersistenceComponents extends WriteSidePersistenceCompon
  */
 trait ReadSideCassandraPersistenceComponents extends ReadSidePersistenceComponents {
   lazy val cassandraSession: CassandraSession = new CassandraSession(actorSystem)
+  lazy val testCasReadSideSettings: CassandraReadSideSettings = new CassandraReadSideSettings(actorSystem)
 
   private[lagom] lazy val cassandraOffsetStore: CassandraOffsetStore =
-    new ScaladslCassandraOffsetStore(actorSystem, cassandraSession, readSideConfig)(executionContext)
+    new ScaladslCassandraOffsetStore(actorSystem, cassandraSession, testCasReadSideSettings, readSideConfig)(executionContext)
   lazy val offsetStore: OffsetStore = cassandraOffsetStore
 
   lazy val cassandraReadSide: CassandraReadSide = new CassandraReadSideImpl(actorSystem, cassandraSession, cassandraOffsetStore)

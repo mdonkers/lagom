@@ -79,7 +79,7 @@ object UnidocRoot extends AutoPlugin {
       |</script>""".stripMargin.replaceAll("\n", "\\\\n").replaceAll("\"", "\\\\\"")
 
   /**
-    * JDK 1.8.8_121 introduced a restriction that prevents the inclusion of JS inside generated
+    * JDK 1.8.0_121 introduced a restriction that prevents the inclusion of JS inside generated
     * javadoc HTML files. That check can be disabled but requires an extra argument.
     */
   private val JavaBuildVersion = """1\.8\.0_(\d+)""".r
@@ -94,6 +94,8 @@ object UnidocRoot extends AutoPlugin {
       (unidocAllSources in (JavaUnidoc, unidoc)).value
         .map(_.filterNot(f => excludeJavadoc.exists(f.getCanonicalPath.contains)))
       },
+    // Override the Scala unidoc target to *not* include the Scala version, since we don't cross-build docs
+    target in (ScalaUnidoc, unidoc) := target.value / "unidoc",
     scalacOptions in (ScalaUnidoc, unidoc) ++= Seq("-skip-packages", "com.lightbend.lagom.internal"),
     javacOptions in doc := Seq(
       "-windowtitle", "Lagom Services API",
@@ -158,7 +160,7 @@ object Unidoc extends AutoPlugin {
   // down to two assuming https://github.com/typesafehub/genjavadoc/issues/66 is possible.
   override lazy val projectSettings = inConfig(Genjavadoc)(Defaults.configSettings) ++ Seq(
     ivyConfigurations += GenjavadocCompilerPlugin,
-    libraryDependencies += "com.typesafe.genjavadoc" %% "genjavadoc-plugin" % "0.9" % "genjavadocplugin->default(compile)" cross CrossVersion.full,
+    libraryDependencies += "com.typesafe.genjavadoc" %% "genjavadoc-plugin" % "0.10" % "genjavadocplugin->default(compile)" cross CrossVersion.full,
     scalacOptions in Genjavadoc ++= Seq(
       "-P:genjavadoc:out=" + (target.value / "java"),
       "-P:genjavadoc:fabricateParams=false"

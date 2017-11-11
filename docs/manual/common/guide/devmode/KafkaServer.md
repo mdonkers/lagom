@@ -1,10 +1,10 @@
 # Kafka Server
 
-By default, Lagom services needing to share information between each others use Kafka as a message broker. In a microservice architecture, using a message broker is paramount to avoid coupling services too strongly. Therefore, for conveniency, we have embedded a Kafka server in the development environment, so that you don't have to worry about installing it. There are a number of settings and tasks available to tune the Kafka server to your liking, let's explore them:
+By default, Lagom services that need to share information between each others use Kafka as a message broker. In a microservice architecture, usage of a message broker ensures that the services are not strongly coupled with each other. Therefore, for convenience, we have embedded a Kafka server in the development environment, so that you don't have to worry about installing it. There are a number of settings and tasks available to tune the Kafka server to your liking, let's explore them:
 
 ## Default port
 
-By default, the [Kafka](http://kafka.apache.org/) server is started on port `9092`. Kafka uses [ZooKeeper](https://zookeeper.apache.org/), and hence a ZooKeeper server is also started on port `2181`. If the current default ports don't suit you, you can change either by adding the following in your build.
+By default, the [Kafka](https://kafka.apache.org/) server is started on port `9092`. Kafka uses [ZooKeeper](https://zookeeper.apache.org/), and hence a ZooKeeper server is also started on port `2181`. If the current default ports don't suit you, you can change either by adding the following in your build.
 
 In the Maven root project pom:
 

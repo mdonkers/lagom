@@ -4,18 +4,19 @@
 package play.core.server
 
 import java.io.File
+
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
-import com.lightbend.lagom.sbt.server.ReloadableServer
 import play.api._
-import play.api.libs.concurrent.ActorSystemProvider
 import play.core.{ ApplicationProvider, BuildLink, SourceMapper }
+import play.core.server.ReloadableServer
 import play.utils.Threads
+
+import scala.collection.JavaConverters._
 import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 import scala.util.{ Failure, Success, Try }
-import scala.collection.JavaConverters._
 
 /**
  * Used to start servers in 'dev' mode, a mode where the application
@@ -62,9 +63,15 @@ object LagomReloadableDevServerStart {
         val process = new RealServerProcess(args = Seq.empty)
         val path: File = buildLink.projectPath
 
-        val dirAndDevSettings: Map[String, String] = ServerConfig.rootDirConfig(path) ++ buildLink.settings.asScala.toMap ++
-          (httpPort.toList.map("play.server.http.port" -> _.toString).toMap) +
-          ("play.server.http.address" -> httpAddress)
+        val dirAndDevSettings: Map[String, String] =
+          ServerConfig.rootDirConfig(path) ++
+            buildLink.settings.asScala.toMap ++
+            httpPort.toList.map("play.server.http.port" -> _.toString).toMap +
+            ("play.server.http.address" -> httpAddress) +
+            {
+              // on dev-mode, we often have more than one cluster on the same jvm
+              "akka.cluster.jmx.multi-mbeans-in-same-jvm" -> "on"
+            }
 
         // Use plain Java call here in case of scala classloader mess
         {
@@ -155,7 +162,8 @@ object LagomReloadableDevServerStart {
 
                       Success(newApplication)
                     } catch {
-                      case e: com.google.inject.CreationException =>
+                      // No binary dependency on play-guice
+                      case e if e.getClass.getName == "com.google.inject.CreationException" =>
                         lastState = Failure(e)
                         val hint = "Hint: Maybe you have forgot to enable your service Module class via `play.modules.enabled`? (check in your project's application.conf)"
                         logExceptionAndGetResult(path, e, hint)
@@ -216,19 +224,10 @@ object LagomReloadableDevServerStart {
         val devModeAkkaConfig = serverConfig.configuration.underlying.getConfig("lagom.akka.dev-mode.config")
         val actorSystemName = serverConfig.configuration.underlying.getString("lagom.akka.dev-mode.actor-system.name")
         val actorSystem = ActorSystem(actorSystemName, devModeAkkaConfig)
-        val serverContext = ServerProvider.Context(serverConfig, appProvider, actorSystem,
-          ActorMaterializer()(actorSystem), () => {
-            // The execution context won't be needed after merging
-            // https://github.com/playframework/playframework/pull/5506
-            import scala.concurrent.ExecutionContext.Implicits.global
-            actorSystem.terminate().map(_ => ())
-          })
+        val serverContext = ServerProvider.Context(serverConfig, appProvider, actorSystem, ActorMaterializer()(actorSystem),
+          () => actorSystem.terminate())
         val serverProvider = ServerProvider.fromConfiguration(classLoader, serverConfig.configuration)
-        val server = serverProvider.createServer(serverContext)
-        val reloadableServer = new ReloadableServer(server) {
-          def reload(): Unit = appProvider.get
-        }
-        reloadableServer
+        serverProvider.createServer(serverContext)
       } catch {
         case e: ExceptionInInitializerError => throw e.getCause
       }

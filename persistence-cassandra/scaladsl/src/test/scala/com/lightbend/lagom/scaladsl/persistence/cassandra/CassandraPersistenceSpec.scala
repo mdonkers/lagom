@@ -18,10 +18,10 @@ class CassandraPersistenceSpec private (system: ActorSystem) extends ActorSystem
 
   def this(testName: String, config: Config, jsonSerializerRegistry: JsonSerializerRegistry) =
     this(ActorSystem(testName, ActorSystemSetup(
-      BootstrapSetup(TestUtil.persistenceConfig(
+      BootstrapSetup(config.withFallback(TestUtil.persistenceConfig(
         testName,
         CassandraLauncher.randomPort
-      )),
+      ))),
       JsonSerializerRegistry.serializationSetupFor(jsonSerializerRegistry)
     )))
 
@@ -33,7 +33,7 @@ class CassandraPersistenceSpec private (system: ActorSystem) extends ActorSystem
     super.beforeAll()
 
     val cassandraDirectory = new File("target/" + system.name)
-    CassandraLauncher.start(cassandraDirectory, CassandraLauncher.DefaultTestConfigResource, clean = true, port = 0)
+    CassandraLauncher.start(cassandraDirectory, "lagom-test-embedded-cassandra.yaml", clean = true, port = 0)
     TestUtil.awaitPersistenceInit(system)
 
     // Join ourselves - needed because the Cassandra offset store uses cluster startup task

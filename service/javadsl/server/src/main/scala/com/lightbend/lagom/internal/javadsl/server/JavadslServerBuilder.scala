@@ -4,7 +4,6 @@
 package com.lightbend.lagom.internal.javadsl.server
 
 import java.util.function.{ BiFunction, Function => JFunction }
-import java.util.stream.Collectors
 import javax.inject.{ Inject, Provider, Singleton }
 
 import akka.stream.Materializer
@@ -19,8 +18,8 @@ import com.lightbend.lagom.javadsl.api.transport.{ RequestHeader => _, _ }
 import com.lightbend.lagom.javadsl.api.{ Descriptor, Service, ServiceInfo }
 import com.lightbend.lagom.javadsl.jackson.{ JacksonExceptionSerializer, JacksonSerializerFactory }
 import com.lightbend.lagom.javadsl.server.ServiceGuiceSupport.{ ClassServiceBinding, InstanceServiceBinding }
-import com.lightbend.lagom.javadsl.server.{ PlayServiceCall, ServiceGuiceSupport }
-import org.pcollections.{ HashTreePMap, TreePVector }
+import com.lightbend.lagom.javadsl.server.{ LagomServiceRouter, PlayServiceCall, ServiceGuiceSupport }
+import org.pcollections.HashTreePMap
 import play.api.http.HttpConfiguration
 import play.api.inject.Injector
 import play.api.mvc.{ RequestHeader => PlayRequestHeader, ResponseHeader => _, _ }
@@ -38,6 +37,8 @@ import scala.concurrent.{ ExecutionContext, Future }
 class JavadslServerBuilder @Inject() (environment: Environment, httpConfiguration: HttpConfiguration,
                                       jacksonSerializerFactory:   JacksonSerializerFactory,
                                       jacksonExceptionSerializer: JacksonExceptionSerializer)(implicit ec: ExecutionContext, mat: Materializer) {
+
+  private val log = Logger(this.getClass)
 
   /**
    * Create a router for the given services.
@@ -85,6 +86,10 @@ class JavadslServerBuilder @Inject() (environment: Environment, httpConfiguratio
         .map { descriptor =>
           descriptor.name() -> descriptor.acls()
         }.toMap.asJava
+      if (locatableServices.size() > 1) {
+        log.warn("Bundling more than one locatable service descriptor inside a single LagomService is deprecated.")
+      }
+      // TODO: replace with factory method ServiceInfo#of when dropping support for multiple locatable services
       new ServiceInfo(descriptors.head.name, HashTreePMap.from(locatableServices))
     } else {
       throw new IllegalArgumentException(s"Don't know how to load services that don't implement Service. Provided: ${interfaces.mkString("[", ", ", "]")}")
@@ -112,9 +117,7 @@ class ResolvedServicesProvider(bindings: Seq[ServiceGuiceSupport.ServiceBinding[
 }
 
 @Singleton
-class JavadslServicesRouter @Inject() (resolvedServices: ResolvedServices, httpConfiguration: HttpConfiguration)(implicit
-  ec: ExecutionContext,
-                                                                                                                 mat: Materializer) extends SimpleRouter {
+class JavadslServicesRouter @Inject() (resolvedServices: ResolvedServices, httpConfiguration: HttpConfiguration)(implicit ec: ExecutionContext, mat: Materializer) extends SimpleRouter with LagomServiceRouter {
 
   private val serviceRouters = resolvedServices.services.map { service =>
     new JavadslServiceRouter(service.descriptor, service.service, httpConfiguration)
@@ -127,7 +130,7 @@ class JavadslServicesRouter @Inject() (resolvedServices: ResolvedServices, httpC
 }
 
 class JavadslServiceRouter(override protected val descriptor: Descriptor, service: Any, httpConfiguration: HttpConfiguration)(implicit ec: ExecutionContext, mat: Materializer)
-  extends ServiceRouter(httpConfiguration) with JavadslServiceApiBridge {
+  extends ServiceRouter(httpConfiguration) with JavadslServiceApiBridge with LagomServiceRouter {
 
   private class JavadslServiceRoute(override val call: Call[Any, Any]) extends ServiceRoute {
     override val path: Path = JavadslPath.fromCallId(call.callId)
@@ -157,10 +160,13 @@ class JavadslServiceRouter(override protected val descriptor: Descriptor, servic
   /**
    * Create the action.
    */
-  override protected def action[Request, Response](call: Call[Request, Response], descriptor: Descriptor,
-                                                   requestSerializer:  MessageSerializer[Request, ByteString],
-                                                   responseSerializer: MessageSerializer[Response, ByteString], requestHeader: RequestHeader,
-                                                   serviceCall: ServiceCall[Request, Response]): EssentialAction = {
+  override protected def action[Request, Response](
+    call:               Call[Request, Response],
+    descriptor:         Descriptor,
+    serviceCall:        ServiceCall[Request, Response],
+    requestSerializer:  MessageSerializer[Request, ByteString],
+    responseSerializer: MessageSerializer[Response, ByteString]
+  ): EssentialAction = {
 
     serviceCall match {
       // If it's a Play service call, then rather than creating the action directly, we let it create the action, and
@@ -169,18 +175,18 @@ class JavadslServiceRouter(override protected val descriptor: Descriptor, servic
         playServiceCall.invoke(
           new java.util.function.Function[ServiceCall[Request, Response], play.mvc.EssentialAction] {
             override def apply(serviceCall: ServiceCall[Request, Response]): play.mvc.EssentialAction = {
-              createAction(serviceCall, call, descriptor, requestSerializer, responseSerializer, requestHeader).asJava
+              createAction(call, descriptor, serviceCall, requestSerializer, responseSerializer).asJava
             }
           }
         )
       case _ =>
-        createAction(serviceCall, call, descriptor, requestSerializer, responseSerializer, requestHeader)
+        createAction(call, descriptor, serviceCall, requestSerializer, responseSerializer)
     }
   }
 
   override protected def maybeLogException(exc: Throwable, log: => Logger, call: Call[_, _]) = {
     exc match {
-      case _: NotFound | _: Forbidden => // no logging
+      case _: NotFound | _: Forbidden | _: BadRequest => // no logging
       case e @ (_: UnsupportedMediaType | _: PayloadTooLarge | _: NotAcceptable) =>
         log.warn(e.getMessage)
       case e =>

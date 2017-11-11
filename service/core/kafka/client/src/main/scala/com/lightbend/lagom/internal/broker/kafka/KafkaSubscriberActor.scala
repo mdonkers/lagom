@@ -12,15 +12,17 @@ import akka.kafka.scaladsl.{ Consumer => ReactiveConsumer }
 import akka.kafka.{ AutoSubscription, ConsumerSettings }
 import akka.pattern.pipe
 import akka.stream.scaladsl.{ Flow, GraphDSL, Keep, Sink, Source, Unzip, Zip }
-import akka.stream.{ FlowShape, KillSwitch, KillSwitches, Materializer }
+import akka.stream._
+import com.lightbend.lagom.internal.api.UriUtils
+import org.apache.kafka.clients.consumer.ConsumerRecord
 
 import scala.concurrent.{ ExecutionContext, Future, Promise }
 
-private[lagom] class KafkaSubscriberActor[Message](
+private[lagom] class KafkaSubscriberActor[Payload, SubscriberPayload](
   kafkaConfig: KafkaConfig, consumerConfig: ConsumerConfig,
-  locateService: String => Future[Option[URI]], topicId: String, flow: Flow[Message, Done, _],
-  consumerSettings: ConsumerSettings[String, Message], subscription: AutoSubscription,
-  streamCompleted: Promise[Done]
+  locateService: String => Future[Seq[URI]], topicId: String, flow: Flow[SubscriberPayload, Done, _],
+  consumerSettings: ConsumerSettings[String, Payload], subscription: AutoSubscription,
+  streamCompleted: Promise[Done], transform: ConsumerRecord[String, Payload] => SubscriberPayload
 )(implicit mat: Materializer, ec: ExecutionContext) extends Actor with ActorLogging {
 
   /** Switch used to terminate the on-going Kafka publishing stream when this actor fails.*/
@@ -30,7 +32,10 @@ private[lagom] class KafkaSubscriberActor[Message](
     kafkaConfig.serviceName match {
       case Some(name) =>
         log.debug("Looking up Kafka service from service locator with name [{}] for at least once source", name)
-        locateService(name) pipeTo self
+        locateService(name).map {
+          case Nil  => None
+          case uris => Some(UriUtils.hostAndPorts(uris))
+        } pipeTo self
         context.become(locatingService(name))
       case None =>
         run(None)
@@ -50,14 +55,14 @@ private[lagom] class KafkaSubscriberActor[Message](
       log.error("Unable to locate Kafka service named [{}]", name)
       context.stop(self)
 
-    case Some(uri: URI) =>
-      log.debug("Kafka service [{}] located at URI [{}] for subscriber of [{}]", name, uri, topicId)
-      run(Some(uri))
+    case Some(uris: String) =>
+      log.debug("Kafka service [{}] located at URI [{}] for subscriber of [{}]", name, uris, topicId)
+      run(Some(uris))
   }
 
   private def running: Receive = {
     case Status.Failure(e) =>
-      log.error("Topic subscription interrupted due to failure", e)
+      log.error("Topic subscription interrupted due to failure: [{}]", e)
       throw e
 
     case Done =>
@@ -68,9 +73,9 @@ private[lagom] class KafkaSubscriberActor[Message](
 
   override def receive = PartialFunction.empty
 
-  private def run(uri: Option[URI]) = {
+  private def run(uri: Option[String]) = {
     val (killSwitch, streamDone) =
-      atLeastOnce(flow, uri)
+      atLeastOnce(uri)
         .viaMat(KillSwitches.single)(Keep.right)
         .toMat(Sink.ignore)(Keep.both)
         .run()
@@ -80,22 +85,22 @@ private[lagom] class KafkaSubscriberActor[Message](
     context.become(running)
   }
 
-  private def atLeastOnce(flow: Flow[Message, Done, _], serviceLocatorUri: Option[URI]): Source[Done, _] = {
+  private def atLeastOnce(serviceLocatorUris: Option[String]): Source[Done, _] = {
     // Creating a Source of pair where the first element is a reactive-kafka committable offset,
     // and the second it's the actual message. Then, the source of pair is splitted into
     // two streams, so that the `flow` passed in argument can be applied to the underlying message.
     // After having applied the `flow`, the two streams are combined back and the processed message's
     // offset is committed to Kafka.
-    val consumerSettingsWithUri = serviceLocatorUri match {
-      case Some(uri) => consumerSettings.withBootstrapServers(s"${uri.getHost}:${uri.getPort}")
-      case None      => consumerSettings
+    val consumerSettingsWithUri = serviceLocatorUris match {
+      case Some(uris) => consumerSettings.withBootstrapServers(uris)
+      case None       => consumerSettings
     }
     val pairedCommittableSource = ReactiveConsumer.committableSource(consumerSettingsWithUri, subscription)
-      .map(committableMessage => (committableMessage.committableOffset, committableMessage.record.value))
+      .map(committableMessage => (committableMessage.committableOffset, transform(committableMessage.record)))
 
     val committOffsetFlow = Flow.fromGraph(GraphDSL.create(flow) { implicit builder => flow =>
       import GraphDSL.Implicits._
-      val unzip = builder.add(Unzip[CommittableOffset, Message])
+      val unzip = builder.add(Unzip[CommittableOffset, SubscriberPayload])
       val zip = builder.add(Zip[CommittableOffset, Done])
       val committer = {
         val commitFlow = Flow[(CommittableOffset, Done)]
@@ -105,8 +110,11 @@ private[lagom] class KafkaSubscriberActor[Message](
           .mapAsync(parallelism = 3)(_.commitScaladsl())
         builder.add(commitFlow)
       }
+      // To allow the user flow to do its own batching, the offset side of the flow needs to effectively buffer
+      // infinitely to give full control of backpressure to the user side of the flow.
+      val offsetBuffer = Flow[CommittableOffset].buffer(consumerConfig.offsetBuffer, OverflowStrategy.backpressure)
 
-      unzip.out0 ~> zip.in0
+      unzip.out0 ~> offsetBuffer ~> zip.in0
       unzip.out1 ~> flow ~> zip.in1
       zip.out ~> committer.in
 
@@ -118,12 +126,28 @@ private[lagom] class KafkaSubscriberActor[Message](
 }
 
 object KafkaSubscriberActor {
-  def props[Message](
-    kafkaConfig: KafkaConfig, consumerConfig: ConsumerConfig, locateService: String => Future[Option[URI]],
-    topicId: String, flow: Flow[Message, Done, _],
-    consumerSettings: ConsumerSettings[String, Message], subscription: AutoSubscription,
-    streamCompleted: Promise[Done]
+  def props[Payload, SubscriberPayload](
+    kafkaConfig:      KafkaConfig,
+    consumerConfig:   ConsumerConfig,
+    locateService:    String => Future[Seq[URI]],
+    topicId:          String,
+    flow:             Flow[SubscriberPayload, Done, _],
+    consumerSettings: ConsumerSettings[String, Payload],
+    subscription:     AutoSubscription,
+    streamCompleted:  Promise[Done],
+    transform:        ConsumerRecord[String, Payload] => SubscriberPayload
   )(implicit mat: Materializer, ec: ExecutionContext) =
-    Props(new KafkaSubscriberActor[Message](kafkaConfig, consumerConfig, locateService, topicId, flow, consumerSettings,
-      subscription, streamCompleted))
+    Props(
+      new KafkaSubscriberActor[Payload, SubscriberPayload](
+        kafkaConfig,
+        consumerConfig,
+        locateService,
+        topicId,
+        flow,
+        consumerSettings,
+        subscription,
+        streamCompleted,
+        transform
+      )
+    )
 }

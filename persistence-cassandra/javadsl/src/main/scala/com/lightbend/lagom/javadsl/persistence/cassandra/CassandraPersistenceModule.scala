@@ -30,7 +30,6 @@ class CassandraPersistenceModule extends AbstractModule {
     binder.bind(classOf[PersistentEntityRegistry]).to(classOf[CassandraPersistentEntityRegistry])
     binder.bind(classOf[CassandraSession])
     binder.bind(classOf[CassandraReadSide]).to(classOf[CassandraReadSideImpl])
-    binder.bind(classOf[CassandraConfig]).toProvider(classOf[CassandraConfigProvider])
     binder.bind(classOf[CassandraOffsetStore]).to(classOf[JavadslCassandraOffsetStore])
     binder.bind(classOf[OffsetStore]).to(Key.get(classOf[CassandraOffsetStore]))
     initServiceLocatorHolder()
@@ -41,14 +40,14 @@ class CassandraPersistenceModule extends AbstractModule {
       override def hear[I](typeLiteral: TypeLiteral[I], typeEncounter: TypeEncounter[I]): Unit = {
         typeEncounter.register(new InjectionListener[I] {
           override def afterInjection(i: I): Unit = {
-            i.asInstanceOf[CassandraPersistenceModule.InitServiceLocatorHolder].init();
+            i.asInstanceOf[CassandraPersistenceModule.InitServiceLocatorHolder].init()
           }
         })
       }
     }
     val matcher = new AbstractMatcher[TypeLiteral[_]] {
       override def matches(typeLiteral: TypeLiteral[_]): Boolean = {
-        return classOf[CassandraPersistenceModule.InitServiceLocatorHolder] == typeLiteral.getRawType;
+        classOf[CassandraPersistenceModule.InitServiceLocatorHolder] == typeLiteral.getRawType
       }
     }
     binder.bindListener(matcher, listener)
@@ -62,25 +61,28 @@ private object CassandraPersistenceModule {
     @volatile private var serviceLocator: Option[ServiceLocator] = None
     @volatile private var env: Option[play.Environment] = None
 
-    @Inject(optional = true) def setServiceLocator(_serviceLocator: ServiceLocator): Unit = {
+    @Inject(optional = true)
+    def setServiceLocator(_serviceLocator: ServiceLocator): Unit = {
       serviceLocator = Some(_serviceLocator)
     }
 
-    @Inject(optional = true) def setEnvironment(_env: play.Environment): Unit = {
+    @Inject(optional = true)
+    def setEnvironment(_env: play.Environment): Unit = {
       env = Some(_env)
     }
 
     private[CassandraPersistenceModule] def init(): Unit = {
       serviceLocator.foreach { locator =>
         ServiceLocatorHolder(system).setServiceLocator(new ServiceLocatorAdapter {
-          override def locate(name: String): Future[Option[URI]] = {
+          override def locateAll(name: String): Future[List[URI]] = {
             import system.dispatcher
             import scala.compat.java8.FutureConverters._
-            import scala.compat.java8.OptionConverters._
-            locator.locate(name).toScala.map(_.asScala)
+            import scala.collection.JavaConversions._
+            locator.locateAll(name).toScala.map(_.toList)
           }
         })
       }
     }
   }
+
 }

@@ -19,9 +19,7 @@ class JdbcBlogApplicationLoader extends LagomApplicationLoader {
   override def loadDevMode(context: LagomApplicationContext): LagomApplication =
     new BlogApplication(context) with LagomDevModeComponents
 
-  override def describeServices = List(
-    readDescriptor[BlogService]
-  )
+  override def describeService = Some(readDescriptor[BlogService])
 }
 
 //#load-components
@@ -33,10 +31,7 @@ abstract class BlogApplication(context: LagomApplicationContext)
 //#load-components
 
   // Bind the services that this server provides
-  override lazy val lagomServer = LagomServer.forServices(
-// TODO for docs BlogServiceImpl has to be class, no trait
-// bindService[BlogService].to(wire[BlogServiceImpl])
-  )
+  override lazy val lagomServer = ???
 
   // Register the JSON serializer registry
   override lazy val jsonSerializerRegistry = BlogPostSerializerRegistry

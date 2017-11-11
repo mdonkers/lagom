@@ -6,11 +6,10 @@ package com.lightbend.lagom.maven
 import java.io.File
 import javax.inject.Inject
 
-import com.lightbend.lagom.dev.{ Colors, ConsoleHelper, LagomConfig }
+import com.lightbend.lagom.dev.{ Colors, ConsoleHelper }
 import com.lightbend.lagom.dev.PortAssigner.ProjectName
 import org.apache.maven.execution.MavenSession
 import org.apache.maven.model.Dependency
-import play.dev.filewatch.LoggerProxy
 
 import scala.beans.BeanProperty
 import java.util.{ Collections, List => JList }
@@ -22,7 +21,7 @@ import scala.collection.JavaConverters._
 /**
  * Run a service, blocking until the user hits enter before stopping it again.
  */
-class RunMojo @Inject() (mavenFacade: MavenFacade, logger: LoggerProxy, session: MavenSession) extends LagomAbstractMojo {
+class RunMojo @Inject() (mavenFacade: MavenFacade, logger: MavenLoggerProxy, session: MavenSession) extends LagomAbstractMojo {
 
   private val consoleHelper = new ConsoleHelper(new Colors("lagom.noformat"))
 
@@ -118,10 +117,7 @@ class StartMojo @Inject() (serviceManager: ServiceManager, session: MavenSession
       Some(this.cassandraPort)
     } else None
 
-    val cassandraKeyspace = LagomConfig.normalizeCassandraKeyspaceName(project.getArtifactId)
-
-    serviceManager.startServiceDevMode(project, selectedPort, serviceLocatorUrl, cassandraPort, cassandraKeyspace,
-      playService = playService, resolvedWatchDirs)
+    serviceManager.startServiceDevMode(project, selectedPort, serviceLocatorUrl, cassandraPort, playService = playService, resolvedWatchDirs)
   }
 }
 
@@ -204,12 +200,9 @@ class StartExternalProjects @Inject() (serviceManager: ServiceManager, session: 
 
       val serviceCassandraPort = cassandraPort.filter(_ => project.cassandraEnabled)
 
-      val cassandraKeyspace = LagomConfig.normalizeCassandraKeyspaceName(project.artifact.getArtifactId)
-
       val dependency = RepositoryUtils.toDependency(project.artifact, session.getRepositorySession.getArtifactTypeRegistry)
 
-      serviceManager.startExternalProject(dependency, selectedPort, serviceLocatorUrl, serviceCassandraPort, cassandraKeyspace,
-        playService = project.playService)
+      serviceManager.startExternalProject(dependency, selectedPort, serviceLocatorUrl, serviceCassandraPort, playService = project.playService)
     }
   }
 

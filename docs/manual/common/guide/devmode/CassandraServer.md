@@ -1,6 +1,6 @@
 # Cassandra Server
 
-By default, Lagom services needing to persist data use Cassandra as database. Therefore, for conveniency, we have embedded a Cassandra server in the development environment, so that you don't have to worry about installing it. There are a number of settings and tasks available to tune the Cassandra server to your liking, let's explore them:
+By default, Lagom services needing to persist data use Cassandra as database. For convenience, we have embedded a Cassandra server in the development environment, so that you don't have to worry about installing it. There are a number of settings and tasks available to tune the Cassandra server to your liking, let's explore them:
 
 ## Default port
 
@@ -44,43 +44,6 @@ In sbt:
 
 @[cassandra-clean-on-start](code/build-cassandra-opts.sbt)
 
-# Keyspace
-
-A keyspace in Cassandra is a namespace that defines data replication on nodes. Each service should use a unique keyspace name so that the tables of different services are not conflicting with each other. But don't worry, we have already taken care of that and, by default, the keyspace is automatically set to be the project's name (after possibly having replaced a few characters that aren't allowed). If the generated keyspace doesn't suit you, you are free to provide a custom one.
-
-In Maven, you can do this by modifying the service implementations pom configuration:
-
-```xml
-<plugin>
-    <groupId>com.lightbend.lagom</groupId>
-    <artifactId>lagom-maven-plugin</artifactId>
-    <configuration>
-        <lagomService>true</lagomService>
-        <cassandraKeyspace>users</cassandraKeyspace>
-    </configuration>
-</plugin>
-```
-
-In sbt, let's assume you have the following Lagom project in your build:
-
-@[cassandra-users-project](code/build-cassandra-opts-lang.sbt)
-
-Because the project's name is `users-impl`, the generated Cassandra keyspace will be `users_impl` (note that dashes are replaced with underscores). If you'd prefer the keyspace to be named simply `users`, you could either change the project's `name` to be `users`, or alternatively add the following setting:
-
-@[cassandra-users-project-with-keyspace](code/build-cassandra-opts-lang.sbt)
-
-It is worth pointing out that, despite the above, a Cassandra keyspace will still need to be provided when running your service in production. Hence, if you'd like to provide a Cassandra keyspace name that can be used both in development and production, it is recommended to do so via a configuration file.
-
-For instance, instead of setting the keyspace using the `lagomCassandraKeyspace` as we did before, we can obtain the same result by adding the following additional keys/values in the project's `application.conf` (note that if you do not have an `application.conf`, you should create one. For the above defined project, it would be typically placed under `usersImpl/src/main/resources/`):
-
-```
-cassandra-journal.keyspace=users
-cassandra-snapshot-store.keyspace=users
-lagom.persistence.read-side.cassandra.keyspace=users
-```
-
-Note that the keyspace values provided via the `application.conf` will always win over any keyspace name that may be set in the build.
-
 ## JVM options
 
 The Cassandra server is run on a separate process, and a JVM is started with sensible memory defaults. However, if the default JVM options don't suit you, you can override them by adding the following in your build.
@@ -97,7 +60,6 @@ In the Maven root project pom:
              <opt>-Xms256m</opt>
              <opt>-Xmx1024m</opt>
              <opt>-Dcassandra.jmx.local.port=4099</opt>
-             <opt>-DCassandraLauncher.configResource=dev-embedded-cassandra.yaml</opt>
          </cassandraJvmOptions>
     </configuration>
 </plugin>
@@ -106,10 +68,6 @@ In the Maven root project pom:
 In sbt:
 
 @[cassandra-jvm-options](code/build-cassandra-opts.sbt)
-
-## Yaml configuration
-
-As shown above, the the YAML configuration file can be configured by modifying the Cassandra JVM options to include a `-DCassandraLauncher.configResource` system property that points to a resource in your `src/main/resources` directory.
 
 ## Logging
 
@@ -193,4 +151,6 @@ In sbt:
 
 @[local-instance](code/build-cassandra-opts3.sbt)
 
-Assuming your local Cassandra instance is running on port `9042`.
+These two settings will only be used when running Lagom in DevMode. The purpose of these two settings is to disable the embedded Cassandra server and configure the Service Locator in DevMode to still be able to locate Cassandra when looking for `cas_native`. You may want to disable the Lagom-managed Cassandra server if you already have a Cassandra server running locally or in your company infrastructure and prefer using that. In that scenario it doesn't make sense for Lagom to start a Cassandra server and you will also gain few seconds of bootup time.
+
+The service locator setup in these examples assumes your local Cassandra instance is running on port `9042`.

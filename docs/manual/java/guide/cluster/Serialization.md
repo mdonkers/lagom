@@ -10,7 +10,7 @@ To enable JSON serialization for a class you need to implement the [Jsonable](ap
 
 @[jsonable](code/docs/home/serialization/AbstractUser.java)
 
-Note that we're using the [[Immutables|Immutable#Immutables]] library here, so this will generate an immutable `User` class. This is the reason for adding the `@JsonDeserialize` annotation.
+Note that we're using the [[Immutables|Immutable]] library here, so this will generate an immutable `User` class. This is the reason for adding the `@JsonDeserialize` annotation.
 
 ### Jackson Modules
 
@@ -70,7 +70,7 @@ This is how a migration class would look like for adding a `discount` field:
 
 @[add](code/docs/home/serialization/v2b/ItemAddedMigration.java)
 
-Override the `currentVersion` method to define the version numer of the current (latest) version. The first version, when no migration was used, is always 1. Increase this version number whenever you perform a change that is not backwards compatible without migration code.
+Override the `currentVersion` method to define the version number of the current (latest) version. The first version, when no migration was used, is always 1. Increase this version number whenever you perform a change that is not backwards compatible without migration code.
 
 Implement the transformation of the old JSON structure to the new JSON structure in the `transform` method. The [JsonNode](https://fasterxml.github.io/jackson-databind/javadoc/2.6/com/fasterxml/jackson/databind/JsonNode.html) is mutable so you can add and remove fields, or change values. Note that you have to cast to specific sub-classes such as [ObjectNode](https://fasterxml.github.io/jackson-databind/javadoc/2.6/com/fasterxml/jackson/databind/node/ObjectNode.html) and [ArrayNode](https://fasterxml.github.io/jackson-databind/javadoc/2.6/com/fasterxml/jackson/databind/node/ArrayNode.html) to get access to mutators.
 

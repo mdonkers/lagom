@@ -11,7 +11,7 @@ Let us first look at how a service implementation can retrieve data from Cassand
 
 Note that the [CassandraSession](api/index.html#com/lightbend/lagom/scaladsl/persistence/cassandra/CassandraSession) is injected in the constructor. `CassandraSession` provides several methods in different flavors for executing queries. The one used in the above example returns a `Source`, i.e. a streamed response. There are also methods for retrieving a list of rows, which can be useful when you know that the result set is small, e.g. when you have included a `LIMIT` clause.
 
-All methods in `CassandraSession` are non-blocking and they return a `Future` or a `Source`. The statements are expressed in [Cassandra Query Language](http://docs.datastax.com/en/cql/3.3/cql/cqlIntro.html) (CQL) syntax. See [Querying tables](http://docs.datastax.com/en/cql/3.3/cql/cql_using/useQueryDataTOC.html) for information about CQL queries.
+All methods in `CassandraSession` are non-blocking and they return a `Future` or a `Source`. The statements are expressed in [Cassandra Query Language](https://docs.datastax.com/en/cql/3.3/cql/cqlIntro.html) (CQL) syntax. See [Querying tables](http://docs.datastax.com/en/cql/3.3/cql/cql_using/useQueryDataTOC.html) for information about CQL queries.
 
 ## Update the Read-Side
 
@@ -75,6 +75,12 @@ Again this callback is optional, here is an example of how to prepare a statemen
 And then to register them:
 
 @[register-prepare](code/docs/home/scaladsl/persistence/CassandraBlogEventProcessor.scala)
+
+### Registering your read-side processor
+
+Once you've created your read-side processor, you need to register it with Lagom. This is done using the [`ReadSide`](api/index.html#com/lightbend/lagom/scaladsl/persistence/ReadSide) component:
+
+@[register-event-processor](code/docs/home/scaladsl/persistence/BlogServiceImpl3.scala)
 
 ### Event handlers
 

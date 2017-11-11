@@ -75,6 +75,13 @@ class PersistentEntityTestDriverSpec extends ActorSystemSpec(JsonSerializerRegis
       outcome1.issues should be(List(PersistentEntityTestDriver.UnhandledCommand(undefined)))
     }
 
+    "record unhandled events" in {
+      val driver = newDriver()
+      val unhandledEvent = TestEntity.UnhandledEvtCmd
+      val outcome1 = driver.run(unhandledEvent)
+      outcome1.issues should be(List(PersistentEntityTestDriver.UnhandledEvent(TestEntity.Unhandled)))
+    }
+
     "be able to handle snapshot state" in {
       val driver = newDriver()
       val outcome1 = driver.initialize(Some(
@@ -91,6 +98,16 @@ class PersistentEntityTestDriverSpec extends ActorSystemSpec(JsonSerializerRegis
       outcome2.issues should be(Nil)
     }
 
+    "be able to handle null state" in {
+      // It's unlikely that Scala developers will use null,
+      // but it's consistent with the Java implementation.
+      val driver = newDriver()
+      val outcomeAfterClearing = driver.run(TestEntity.Clear)
+
+      outcomeAfterClearing.state should be(null)
+      outcomeAfterClearing.events.toList should ===(List(TestEntity.Cleared))
+      outcomeAfterClearing.issues.toList should be(Nil)
+    }
   }
 
 }

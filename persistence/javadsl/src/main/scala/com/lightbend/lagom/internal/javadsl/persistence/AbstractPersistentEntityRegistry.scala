@@ -12,7 +12,7 @@ import akka.cluster.sharding.{ ClusterSharding, ClusterShardingSettings, ShardRe
 import akka.event.Logging
 import akka.japi.Pair
 import akka.pattern.ask
-import akka.persistence.query.scaladsl.EventsByTagQuery2
+import akka.persistence.query.scaladsl.EventsByTagQuery
 import akka.persistence.query.{ Offset => AkkaOffset }
 import akka.stream.javadsl
 import akka.util.Timeout
@@ -39,7 +39,7 @@ abstract class AbstractPersistentEntityRegistry(system: ActorSystem, injector: I
   /**
    * The events by tag query. Necessary for implementing read sides and the eventStream query.
    */
-  protected val eventsByTagQuery: Option[EventsByTagQuery2] = None
+  protected val eventsByTagQuery: Option[EventsByTagQuery] = None
 
   private val sharding = ClusterSharding(system)
   private val conf = system.settings.config.getConfig("lagom.persistence")
@@ -52,8 +52,15 @@ abstract class AbstractPersistentEntityRegistry(system: ActorSystem, injector: I
     case "" => None
     case r  => Some(r)
   }
-  private val passivateAfterIdleTimeout: FiniteDuration =
-    conf.getDuration("passivate-after-idle-timeout", TimeUnit.MILLISECONDS).millis
+  private val passivateAfterIdleTimeout: Duration = {
+    val durationMs = conf.getDuration("passivate-after-idle-timeout", TimeUnit.MILLISECONDS)
+    if (durationMs == 0) {
+      // Scaladoc of setReceiveTimeout says "Pass in `Duration.Undefined` to switch off this feature."
+      Duration.Undefined
+    } else {
+      durationMs.millis
+    }
+  }
   private val askTimeout: FiniteDuration = conf.getDuration("ask-timeout", TimeUnit.MILLISECONDS).millis
   private val shardingSettings = ClusterShardingSettings(system).withRole(role)
 

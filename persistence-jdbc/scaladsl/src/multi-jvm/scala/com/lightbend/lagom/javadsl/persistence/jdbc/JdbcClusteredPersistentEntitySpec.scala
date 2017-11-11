@@ -1,26 +1,29 @@
+/*
+ * Copyright (C) 2016-2017 Lightbend Inc. <https://www.lightbend.com>
+ */
 package com.lightbend.lagom.scaladsl.persistence.jdbc
 
 import akka.actor.ActorSystem
-import akka.stream.{ActorMaterializer, Materializer}
+import akka.stream.{ ActorMaterializer, Materializer }
 import com.lightbend.lagom.scaladsl.persistence.TestEntity.Evt
-import com.lightbend.lagom.scaladsl.persistence.multinode.{AbstractClusteredPersistentEntityConfig, AbstractClusteredPersistentEntitySpec}
-import com.lightbend.lagom.scaladsl.persistence.{ReadSideProcessor, TestEntitySerializerRegistry}
+import com.lightbend.lagom.scaladsl.persistence.multinode.{ AbstractClusteredPersistentEntityConfig, AbstractClusteredPersistentEntitySpec }
+import com.lightbend.lagom.scaladsl.persistence.{ ReadSideProcessor, TestEntitySerializerRegistry }
 import com.lightbend.lagom.scaladsl.playjson.JsonSerializerRegistry
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.{ Config, ConfigFactory }
 import org.h2.tools.Server
-import play.api.{Configuration, Environment}
+import play.api.{ Configuration, Environment }
 import play.api.db.HikariCPComponents
-import play.api.inject.{ApplicationLifecycle, DefaultApplicationLifecycle}
+import play.api.inject.{ ApplicationLifecycle, DefaultApplicationLifecycle }
 
-import scala.concurrent.{ExecutionContext, Future}
-
+import scala.concurrent.{ ExecutionContext, Future }
 
 object JdbcClusteredPersistentEntityConfig extends AbstractClusteredPersistentEntityConfig {
   override def additionalCommonConfig(databasePort: Int): Config = ConfigFactory.parseString(
     s"""
       db.default.driver=org.h2.Driver
       db.default.url="jdbc:h2:tcp://localhost:$databasePort/mem:JdbcClusteredPersistentEntitySpec"
-    """)
+    """
+  )
 }
 
 class JdbcClusteredPersistentEntitySpecMultiJvmNode1 extends JdbcClusteredPersistentEntitySpec
@@ -36,7 +39,6 @@ class JdbcClusteredPersistentEntitySpec extends AbstractClusteredPersistentEntit
   override protected def atStartup(): Unit = {
     runOn(node1) {
       h2 = Server.createTcpServer("-tcpPort", databasePort.toString).start()
-
     }
 
     enterBarrier("h2-started")

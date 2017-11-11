@@ -1,12 +1,8 @@
-/*
- * Copyright (C) 2016-2017 Lightbend Inc. <https://www.lightbend.com>
- */
 package ${package}.${service1Name}.impl;
 
 import java.util.Optional;
 
-import javax.annotation.Nullable;
-import javax.annotation.concurrent.Immutable;
+import lombok.Value;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
@@ -34,35 +30,14 @@ public interface ${service1ClassName}Command extends Jsonable {
    * when all the events emitted by this command are successfully persisted.
    */
   @SuppressWarnings("serial")
-  @Immutable
+  @Value
   @JsonDeserialize
-  public final class UseGreetingMessage implements ${service1ClassName}Command, CompressedJsonable, PersistentEntity.ReplyType<Done> {
+  final class UseGreetingMessage implements ${service1ClassName}Command, CompressedJsonable, PersistentEntity.ReplyType<Done> {
     public final String message;
 
     @JsonCreator
     public UseGreetingMessage(String message) {
       this.message = Preconditions.checkNotNull(message, "message");
-    }
-
-    @Override
-    public boolean equals(@Nullable Object another) {
-      return this == another || another instanceof UseGreetingMessage && equalTo((UseGreetingMessage) another);
-    }
-
-    private boolean equalTo(UseGreetingMessage another) {
-      return message.equals(another.message);
-    }
-
-    @Override
-    public int hashCode() {
-      int h = 31;
-      h = h * 17 + message.hashCode();
-      return h;
-    }
-
-    @Override
-    public String toString() {
-      return MoreObjects.toStringHelper("UseGreetingMessage").add("message", message).toString();
     }
   }
 
@@ -73,38 +48,15 @@ public interface ${service1ClassName}Command extends Jsonable {
    * person.
    */
   @SuppressWarnings("serial")
-  @Immutable
+  @Value
   @JsonDeserialize
-  public final class Hello implements ${service1ClassName}Command, PersistentEntity.ReplyType<String> {
+  final class Hello implements ${service1ClassName}Command, PersistentEntity.ReplyType<String> {
+
     public final String name;
-    public final Optional<String> organization;
 
     @JsonCreator
-    public Hello(String name, Optional<String> organization) {
+    public Hello(String name) {
       this.name = Preconditions.checkNotNull(name, "name");
-      this.organization = Preconditions.checkNotNull(organization, "organization");
-    }
-
-    @Override
-    public boolean equals(@Nullable Object another) {
-      return this == another || another instanceof Hello && equalTo((Hello) another);
-    }
-
-    private boolean equalTo(Hello another) {
-      return name.equals(another.name) && organization.equals(another.organization);
-    }
-
-    @Override
-    public int hashCode() {
-      int h = 31;
-      h = h * 17 + name.hashCode();
-      h = h * 17 + organization.hashCode();
-      return h;
-    }
-
-    @Override
-    public String toString() {
-      return MoreObjects.toStringHelper("Hello").add("name", name).add("organization", organization).toString();
     }
   }
 

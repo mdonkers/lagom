@@ -1,6 +1,3 @@
-/*
- * Copyright (C) 2016-2017 Lightbend Inc. <https://www.lightbend.com>
- */
 package ${package}.it;
 
 import akka.actor.ActorSystem;
@@ -26,7 +23,7 @@ import static org.junit.Assert.assertEquals;
 
 public class ${service2ClassName}IT {
 
-    private static final String SERVICE_LOCATOR_URI = "http://localhost:8000";
+    private static final String SERVICE_LOCATOR_URI = "http://localhost:9008";
 
     private static LagomClientFactory clientFactory;
     private static ${service1ClassName}Service ${service1Name}Service;
@@ -59,7 +56,7 @@ public class ${service2ClassName}IT {
         // Important to concat our source with a maybe, this ensures the connection doesn't get closed once we've
         // finished feeding our elements in, and then also to take 3 from the response stream, this ensures our
         // connection does get closed once we've received the 3 elements.
-        Source<String, ?> response = await(${service2Name}Service.stream().invoke(
+        Source<String, ?> response = await(${service2Name}Service.directStream().invoke(
                 Source.from(Arrays.asList("a", "b", "c"))
                         .concat(Source.maybe())));
         List<String> messages = await(response.take(3).runWith(Sink.seq(), mat));

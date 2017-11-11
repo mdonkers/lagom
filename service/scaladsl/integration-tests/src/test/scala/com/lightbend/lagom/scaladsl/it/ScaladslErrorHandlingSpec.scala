@@ -201,13 +201,11 @@ class ScaladslErrorHandlingSpec extends WordSpec with Matchers {
    * This sets up the server and the client, but allows them to be modified before actually creating them.
    */
   def withClient(changeClient: Descriptor => Descriptor = identity, changeServer: Descriptor => Descriptor = identity,
-                 mode: Mode.Mode = Mode.Prod)(block: Materializer => MockService => Unit): Unit = {
+                 mode: Mode = Mode.Prod)(block: Materializer => MockService => Unit): Unit = {
 
     ServiceTest.withServer(ServiceTest.defaultSetup) { ctx =>
       new LagomApplication(ctx) with AhcWSComponents with LocalServiceLocator {
-        override lazy val lagomServer = LagomServer.forServices(
-          bindService[MockService].to(new MockServiceImpl)
-        )
+        override lazy val lagomServer = serverFor[MockService](new MockServiceImpl)
         override lazy val environment = Environment.simple(mode = mode)
 
         // Custom server builder to inject our changeServer callback

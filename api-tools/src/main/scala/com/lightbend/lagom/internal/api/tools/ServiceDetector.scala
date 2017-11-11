@@ -6,11 +6,11 @@ package com.lightbend.lagom.internal.api.tools
 import com.lightbend.lagom.internal.spi.{ ServiceAcl, ServiceDescription, ServiceDiscovery }
 import com.typesafe.config.ConfigFactory
 import play.api._
-import play.api.libs.json._
 import play.api.libs.functional.syntax._
+import play.api.libs.json._
 
-import scala.collection.immutable
 import scala.collection.JavaConverters._
+import scala.collection.immutable
 import scala.compat.java8.OptionConverters._
 
 /**
@@ -37,7 +37,6 @@ object ServiceDetector {
    * Retrieves the service names and acls for the current Lagom project
    * of all services.
    *
-   *
    * @param classLoader The class loader should contain a sbt project in the classpath
    *                    for which the services should be resolved.
    * @return a JSON array of [[com.lightbend.lagom.internal.spi.ServiceDescription]] objects.
@@ -49,7 +48,10 @@ object ServiceDetector {
     } else {
       config.getString(ApplicationLoaderKey)
     }
+    services(classLoader, serviceDiscoveryClassName)
+  }
 
+  private[tools] def services(classLoader: ClassLoader, serviceDiscoveryClassName: String): String = {
     log.debug("Loading service discovery class: " + serviceDiscoveryClassName)
 
     val serviceDiscoverClass = classLoader.loadClass(serviceDiscoveryClassName)

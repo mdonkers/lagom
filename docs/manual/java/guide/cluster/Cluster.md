@@ -67,17 +67,17 @@ You can read more about cluster joining in the [Akka documentation](http://doc.a
 
 ## Downing
 
-When operating a Lagom service cluster you must consider how to handle network partitions (a.k.a. split brain scenarios) and machine crashes (including JVM and hardware failures). This is crucial for correct behavior when using [[Persistent Entities|PersistentEntity]]. Persistent entities must be single-writers, i.e. there must only be one active entity with a given entity identity. If the cluster is split in two halves and the wrong downing strategy is used there will be active entities with the the same identifiers in both clusters, writing to the same database. That will result in corrupt data.
+When operating a Lagom service cluster you must consider how to handle network partitions (a.k.a. split brain scenarios) and machine crashes (including JVM and hardware failures). This is crucial for correct behavior when using [[Persistent Entities|PersistentEntity]]. Persistent entities must be single-writers, i.e. there must only be one active entity with a given entity identity. If the cluster is split in two halves and the wrong downing strategy is used there will be active entities with the same identifiers in both clusters, writing to the same database. That will result in corrupt data.
 
 The naïve approach is to remove an unreachable node from the cluster membership after a timeout. This works great for crashes and short transient network partitions, but not for long network partitions. Both sides of the network partition will see the other side as unreachable and after a while remove it from its cluster membership. Since this happens on both sides the result is that two separate disconnected clusters have been created. This approach is provided by the opt-in (off by default) auto-down feature in the OSS version of Akka Cluster. Because of this auto-down should not be used in production systems.
 
 **We strongly recommend against using the auto-down feature of Akka Cluster.**
 
-A pre-packaged solution for the downing problem is provided by [Split Brain Resolver](http://doc.akka.io/docs/akka/akka-commercial-addons-1.0/java/split-brain-resolver.html), which is part of the [Lightbend Reactive Platform](https://www.lightbend.com/products/lightbend-reactive-platform). The `keep-majority` strategy is configured to be enabled by default if you use Lagom with the Reactive Platform.
+A pre-packaged solution for the downing problem is provided by [Split Brain Resolver](https://tech-hub.lightbend.com/docs/akka-commercial-addons/current/split-brain-resolver.html), which is part of the [Lightbend Enterprise Suite](https://www.lightbend.com/platform/production). The `keep-majority` strategy is configured to be enabled by default if you use Lagom with the Enterprise Suite.
 
-See [Split Brain Resolver documentation](http://doc.akka.io/docs/akka/akka-commercial-addons-1.0/java/split-brain-resolver.html) and [[Reactive Platform instructions|ReactivePlatform]] for how to enable it in the build of your project.
+See [Split Brain Resolver documentation](https://tech-hub.lightbend.com/docs/akka-commercial-addons/current/split-brain-resolver.html) and [[Reactive Platform instructions|ReactivePlatform]] for how to enable it in the build of your project.
 
-If you don't use RP, you should anyway carefully read the documentation of the [Split Brain Resolver](http://doc.akka.io/docs/akka/akka-commercial-addons-1.0/java/split-brain-resolver.html) and make sure that the solution you are using handles the concerns described there.
+Even if you don't use the commercial Enterprise Suite, you should still read & understand the concepts behind [Split Brain Resolver](https://tech-hub.lightbend.com/docs/akka-commercial-addons/current/split-brain-resolver.html) to ensure your solution handles the concerns described there.
 
 ## Leaving
 

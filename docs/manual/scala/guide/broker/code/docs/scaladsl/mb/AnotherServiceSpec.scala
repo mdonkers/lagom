@@ -1,12 +1,14 @@
 package docs.scaladsl.mb
 
+import akka.{Done, NotUsed}
 import com.lightbend.lagom.scaladsl.api.ServiceCall
 import com.lightbend.lagom.scaladsl.api.broker.Topic
-import com.lightbend.lagom.scaladsl.server.{LagomApplication, LagomApplicationContext, LagomServer, LocalServiceLocator}
+import com.lightbend.lagom.scaladsl.server.{LagomApplication, LagomApplicationContext, LocalServiceLocator}
 import com.lightbend.lagom.scaladsl.testkit.{ProducerStubFactory, ServiceTest, _}
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
+import org.scalatest.time.{Seconds, Span}
+import org.scalatest.{Matchers, WordSpec}
 import play.api.libs.ws.ahc.AhcWSComponents
-import org.scalatest.{AsyncWordSpec, Matchers}
-import akka.{NotUsed, Done}
 
 abstract class AnotherApplication(context: LagomApplicationContext)
   extends LagomApplication(context)
@@ -14,13 +16,12 @@ abstract class AnotherApplication(context: LagomApplicationContext)
 
   lazy val helloService = serviceClient.implement[HelloService]
 
-  override lazy val lagomServer = LagomServer.forServices(
-    bindService[AnotherService].to(new AnotherServiceImpl(helloService))
-  )
+  override lazy val lagomServer = serverFor[AnotherService](new AnotherServiceImpl(helloService))
+
 }
 
 //#topic-test-consuming-from-a-topic
-class AnotherServiceSpec extends AsyncWordSpec with Matchers {
+class AnotherServiceSpec extends WordSpec with Matchers with Eventually with ScalaFutures {
   var producerStub: ProducerStub[GreetingMessage] = _
 
   "The AnotherService" should {
@@ -43,10 +44,15 @@ class AnotherServiceSpec extends AsyncWordSpec with Matchers {
         producerStub.send(GreetingMessage("Hi there!"))
 
         // create a service client to assert the message was consumed
-        server.serviceClient.implement[AnotherService].foo.invoke().map { resp =>
-          resp should ===("Hi there!")
+        eventually(timeout(Span(5, Seconds))) {
+          // cannot use async specs here because eventually only detects raised exceptions to retry.
+          // if a future fail at the first time, eventually won't retry though future will succeed later.
+          // see https://github.com/lagom/lagom/issues/876 for detail info.
+          val futureResp = server.serviceClient.implement[AnotherService].foo.invoke()
+          whenReady(futureResp) { resp =>
+            resp should ===("Hi there!")
+          }
         }
-
       }
   }
 }

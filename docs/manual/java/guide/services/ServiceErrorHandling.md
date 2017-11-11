@@ -4,10 +4,13 @@ Lagom provides a number of different mechanisms for controlling and customising 
 
 There are a number of principles behind the design of Lagom's built in error handling:
 
-* In production, a Lagom service should never give out details of the errors it encounters to another service, unless it knows it is safe to do so.  This is for security reasons, uncensored error messages can be used by attackers to gain detailed information about how a service is implemented.  In practice, this means there are a number of built in exceptions that Lagom considers safe that it will returns the details of, and the rest it returns nothing for.
+* In production, a Lagom service should never give out details of the errors it encounters to another service, unless it knows it is safe to do so.  This is for security reasons, uncensored error messages can be used by attackers to gain detailed information about how a service is implemented.  In practice, this means there are a number of built in exceptions that Lagom considers safe that it will return the details of, and the rest it returns nothing for.
 * In development, it's useful to have full error messages sent over the wire.  Lagom will attempt to send useful information about exceptions when the service is running in development.
 * If possible, Lagom will try to reconstruct errors on the client side when thrown on the service side.  So, if the server side throws an exception saying it couldn't serialize something, the client code should receive that same exception.
 * If possible, exceptions should be mapped to idiomatic protocol response codes, such as HTTP 4xx and 5xx status codes and WebSocket error close codes.
+
+
+If you are using Lagom to consume a service (either implemented in Lagom or a third-party stack) the client Lagom provides will map responses with status code values in the ranges 4xx and 5xx to exceptions. That has an impact on the [[Circuit Breakers|ServiceClients#Circuit-Breakers]] the client is using to connect to that endpoint. By default Lagom Circuit Breakers will account any exception as a failure but that behavior is [[configurable|ServiceClients#Circuit-Breaker-Configuration]]. So 4xx and 5xx will be mapped to exceptions but you can whitelist what exceptions should not trip the circuit breaker.
 
 ## Exception serializers
 

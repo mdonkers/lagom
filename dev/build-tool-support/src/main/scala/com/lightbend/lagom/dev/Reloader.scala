@@ -11,10 +11,9 @@ import java.util
 import java.util.{ Timer, TimerTask }
 import java.util.concurrent.atomic.AtomicReference
 
-import com.lightbend.lagom.sbt.core.Build
-import com.lightbend.lagom.sbt.server.ReloadableServer
 import play.api.PlayException
-import play.core.BuildLink
+import play.core.{ Build, BuildLink }
+import play.core.server.ReloadableServer
 import play.dev.filewatch.{ FileWatchService, SourceModificationWatch, WatchState }
 
 import scala.collection.JavaConverters._
@@ -79,7 +78,7 @@ object Reloader {
     /*
      * We need to do a bit of classloader magic to run the Play application.
      *
-     * There are seven classloaders:
+     * There are six classloaders:
      *
      * 1. buildLoader, the classloader of the build tool plugin (sbt/maven lagom plugin).
      * 2. parentClassLoader, a possibly shared classloader that may contain artifacts
@@ -155,7 +154,6 @@ object Reloader {
 
     val _buildLink = new BuildLink {
       private val initialized = new java.util.concurrent.atomic.AtomicBoolean(false)
-      override def runTask(task: String): AnyRef = throw new UnsupportedOperationException("Run task not supported in Lagom")
       override def reload(): AnyRef = {
         if (initialized.compareAndSet(false, true)) applicationLoader
         else null // this means nothing to reload
@@ -313,7 +311,7 @@ class Reloader(
     }
   }
 
-  lazy val settings = {
+  lazy val settings: util.Map[String, String] = {
     import scala.collection.JavaConverters._
     devSettings.toMap.asJava
   }
@@ -334,12 +332,12 @@ class Reloader(
   def runTask(task: String): AnyRef =
     throw new UnsupportedOperationException("This BuildLink does not support running arbitrary tasks")
 
-  def close() = {
+  def close(): Unit = {
     currentApplicationClassLoader = None
     currentSourceMap = None
     watcher.stop()
     quietTimeTimer.cancel()
   }
 
-  def getClassLoader = currentApplicationClassLoader
+  def getClassLoader: Option[ClassLoader] = currentApplicationClassLoader
 }

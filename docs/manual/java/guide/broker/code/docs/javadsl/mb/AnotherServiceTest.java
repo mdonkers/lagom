@@ -49,6 +49,12 @@ public class AnotherServiceTest {
             // use a service client instance to interact with the service
             // and assert the message was processed as expected.
             // ...
+
+            // You will probably need to wrap your assertion in an
+            // `eventually()` clause so you can retry your assertion
+            // since your invocation via the service client may arrive
+            // before the message was consumed.
+
         });
     }
 
@@ -57,7 +63,7 @@ public class AnotherServiceTest {
         // (2) Receives a ProducerStubFactory that factors ProducerStubs
         @Inject
         HelloServiceStub(ProducerStubFactory producerFactory) {
-            // (3) requesting a producer for a specific topic weill create a Stub for it.
+            // (3) Create a stub to request a producer for a specific topic
             helloProducer = producerFactory.producer(GREETINGS_TOPIC);
         }
 

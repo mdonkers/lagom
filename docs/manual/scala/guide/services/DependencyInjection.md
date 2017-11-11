@@ -6,11 +6,11 @@ Your service's dependencies will have their own dependencies on other APIs in tu
 
 It is common to have clusters of interdependent classes that together form a larger logical component. It can be useful to modularize wiring code in a way that reflects these groupings. You can do so in Scala by defining a "component" trait that includes a combination of lazy val declarations that instantiate concrete implementations of interfaces that the component provides. Some of their constructor parameters may be declared as abstract methods, indicating a dependency that must be provided by another component or your application itself. Your application can then extend multiple components to mix them together into a fully assembled dependency graph. If you don't fulfill all of the declared requirements for the components you include in your service, it will not compile.
 
-In "[Dependency Injection in Scala: guide](http://di-in-scala.github.io/#modules)" this method of mixing components together to form an application is referred to as the "thin cake pattern". The guide also introduces [Macwire](http://di-in-scala.github.io/#macwire) which we'll use in the next steps.
+In "[Dependency Injection in Scala: guide](https://di-in-scala.github.io/#modules)" this method of mixing components together to form an application is referred to as the "thin cake pattern". The guide also introduces [Macwire](https://di-in-scala.github.io/#macwire) which we'll use in the next steps.
 
 ## Wiring together a Lagom application
 
-In section [[Service descriptors|ServiceDescriptors]] and [[Implementing services|ServiceImplementation]] we created a Service and its implementation, we now want to bind them and create a Lagom server with them. Lagom's Scala API is built on top of Play Framework, and uses Play's [compile time dependency injection support](https://www.playframework.com/documentation/2.5.x/ScalaCompileTimeDependencyInjection) to wire together a Lagom application. Play's compile time dependency injection support is based on the thin cake pattern we just described.
+In section [[Service descriptors|ServiceDescriptors]] and [[Implementing services|ServiceImplementation]] we created a Service and its implementation, we now want to bind them and create a Lagom server with them. Lagom's Scala API is built on top of Play Framework, and uses Play's [compile time dependency injection support](https://www.playframework.com/documentation/2.6.x/ScalaCompileTimeDependencyInjection) to wire together a Lagom application. Play's compile time dependency injection support is based on the thin cake pattern we just described.
 
 Once you are creating your Application you will use Components provided by Lagom and obtain your dependencies from them (e.g., an Akka Actor System or a `CassandraSession` for your read-side processor to access the database). Although it's not strictly necessary, we recommend that you use [Macwire](https://github.com/adamw/macwire) to assist in wiring dependencies into your code. Macwire provides some very lightweight macros that locate dependencies for the components you wish to create so that you don't have to manually wire them together yourself. Macwire can be added to your service by adding the following to your service implementations dependencies:
 
@@ -20,7 +20,7 @@ The simplest way to build the Application cake and then wire your code inside it
 
 @[lagom-application](code/ServiceImplementation.scala)
 
-In this sample, the `HelloApplication` gets [[AhcWSComponents|ScalaComponents#Third-party-Components]] mixed in using the cake pattern and implements the `lazy val lagomService` using Macwire. The important method here is the `lagomServer` method. Lagom will use this to discover your service bindings and create a Play router for handling your service calls. You can see that we've bound one service descriptor, the `HelloService`, to our `HelloServiceImpl` implementation. `LagomServer.forServices()` takes an variable number of arguments so you can build a server with many  `Service`s in it (this is often useful to include admin or metrics services with your primary service). When you create a server with many services the first parameter in `LagomServer.forServices()` will be considered the `primary service` and Lagom will use it's name as the server name. So if you create a server with the services `Orders`, `Metrics` and `FraudDetection` then your server will be named `Orders` as that is the primary service.
+In this sample, the `HelloApplication` gets [[AhcWSComponents|ScalaComponents#Third-party-Components]] mixed in using the cake pattern and implements the `lazy val lagomService` using Macwire. The important method here is the `lagomServer` method. Lagom will use this to discover your service bindings and create a Play router for handling your service calls. You can see that we've bound one service descriptor, the `HelloService`, to our `HelloServiceImpl` implementation. The name of the Service Descriptor you bind will be used as the Service name, that is used in cross-service communication to identify the client making a request.
 
 We've used Macwire's `wire` macro to wire the dependencies into `HelloServiceImpl` - at the moment our service actually has no dependencies so we could just construct it manually ourselves, but it's not likely that a real service implementation would have no dependencies.
 
@@ -33,11 +33,11 @@ Having created our application cake, we can now write an application loader. Pla
 
 The loader has two methods that must be implemented, `load` and `loadDevMode`. You can see that we've mixed in different service locators for each method, we've mixed in [`LagomDevModeComponents`](api/com/lightbend/lagom/scaladsl/devmode/LagomDevModeComponents.html) that provides the dev mode service locator and registers the services with it in dev mode, and in prod mode, for now, we've simply provided [`NoServiceLocator`](api/com/lightbend/lagom/scaladsl/api/ServiceLocator$$NoServiceLocator$.html) as the service locator - this is a service locator that will return nothing for every lookup. We'll see in the [[deploying to production|ProductionOverview]] documentation how to select the right service locator for production.
 
-A third method, `describeServices`, is optional, but may be used by tooling, for example by [[ConductR]], to discover what service APIs are offered by this service. The meta data read from here may in turn be used to configure service gateways and other components.
+A third method, `describeService`, is optional, but may be used by tooling, for example by [[ConductR]], to discover what service APIs are offered by this service. The metadata read from here may in turn be used to configure service gateways and other components.
 
 Finally, we need to tell Play about our application loader. We can do that by adding the following configuration to `application.conf`:
 
-    play.application.loader = com.example.HelloLoader
+    play.application.loader = com.example.HelloApplicationLoader
 
 
 ## Defining your own components

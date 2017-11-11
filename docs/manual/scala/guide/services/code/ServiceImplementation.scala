@@ -26,9 +26,7 @@ package lagomapplication {
     extends LagomApplication(context)
       with AhcWSComponents {
 
-    override lazy val lagomServer = LagomServer.forServices(
-      bindService[HelloService].to(wire[HelloServiceImpl])
-    )
+    override lazy val lagomServer = serverFor[HelloService](wire[HelloServiceImpl])
   }
   //#lagom-application
 }
@@ -53,9 +51,7 @@ package lagomloader {
         override def serviceLocator = ServiceLocator.NoServiceLocator
       }
 
-    override def describeServices = List(
-      readDescriptor[HelloService]
-    )
+    override def describeService = Some(readDescriptor[HelloService])
   }
   //#lagom-loader
 }

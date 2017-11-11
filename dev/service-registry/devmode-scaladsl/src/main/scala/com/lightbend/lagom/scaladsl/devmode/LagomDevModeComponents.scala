@@ -7,14 +7,13 @@ import java.net.URI
 
 import akka.actor.ActorSystem
 import akka.stream.Materializer
-import com.lightbend.lagom.internal.client.{ CircuitBreakerConfig, CircuitBreakerMetricsProviderImpl, CircuitBreakers }
 import com.lightbend.lagom.internal.scaladsl.client.{ ScaladslServiceClient, ScaladslServiceResolver, ScaladslWebSocketClient }
 import com.lightbend.lagom.internal.scaladsl.registry.{ ServiceRegistration, ServiceRegistry, ServiceRegistryServiceLocator }
-import com.lightbend.lagom.internal.spi.CircuitBreakerMetricsProvider
 import com.lightbend.lagom.scaladsl.api.Descriptor.Call
-import com.lightbend.lagom.scaladsl.api.{ ServiceInfo, ServiceLocator }
 import com.lightbend.lagom.scaladsl.api.deser.DefaultExceptionSerializer
-import play.api.{ Configuration, Environment }
+import com.lightbend.lagom.scaladsl.api.{ ServiceInfo, ServiceLocator }
+import com.lightbend.lagom.scaladsl.client.CircuitBreakerComponents
+import play.api.Environment
 import play.api.inject.ApplicationLifecycle
 import play.api.libs.ws.WSClient
 
@@ -39,7 +38,7 @@ trait LagomDevModeComponents extends LagomDevModeServiceLocatorComponents {
   def applicationLifecycle: ApplicationLifecycle
 
   // Eagerly register services
-  new ServiceRegistration(serviceInfo, applicationLifecycle, configuration, serviceRegistry)(executionContext)
+  new ServiceRegistration(serviceInfo, applicationLifecycle, config, serviceRegistry)(executionContext)
 }
 
 /**
@@ -52,7 +51,7 @@ trait LagomDevModeComponents extends LagomDevModeServiceLocatorComponents {
  * It expects the service locator URL to be provided using the `lagom.service-locator.url` property, which by default
  * will be automatically provided to the service by Lagom's dev mode build plugins.
  */
-trait LagomDevModeServiceLocatorComponents {
+trait LagomDevModeServiceLocatorComponents extends CircuitBreakerComponents {
   /**
    * If being used in a Lagom service, this will be implemented by
    * [[com.lightbend.lagom.scaladsl.server.LagomServerComponents]], however if it's being
@@ -62,16 +61,11 @@ trait LagomDevModeServiceLocatorComponents {
   def wsClient: WSClient
   def scaladslWebSocketClient: ScaladslWebSocketClient
   def environment: Environment
-  def configuration: Configuration
   def executionContext: ExecutionContext
   def materializer: Materializer
   def actorSystem: ActorSystem
 
-  lazy val circuitBreakerMetricsProvider: CircuitBreakerMetricsProvider = new CircuitBreakerMetricsProviderImpl(actorSystem)
-  lazy val circuitBreakerConfig: CircuitBreakerConfig = new CircuitBreakerConfig(configuration)
-  lazy val circuitBreakers: CircuitBreakers = new CircuitBreakers(actorSystem, circuitBreakerConfig, circuitBreakerMetricsProvider)
-
-  lazy val devModeServiceLocatorUrl: URI = URI.create(configuration.underlying.getString("lagom.service-locator.url"))
+  lazy val devModeServiceLocatorUrl: URI = URI.create(config.getString("lagom.service-locator.url"))
   lazy val serviceRegistry: ServiceRegistry = {
 
     // We need to create our own static service locator since the service locator will depend on this service registry.
@@ -98,5 +92,5 @@ trait LagomDevModeServiceLocatorComponents {
     serviceClient.implement[ServiceRegistry]
   }
 
-  lazy val serviceLocator: ServiceLocator = new ServiceRegistryServiceLocator(circuitBreakers, serviceRegistry, executionContext)
+  lazy val serviceLocator: ServiceLocator = new ServiceRegistryServiceLocator(circuitBreakersPanel, serviceRegistry, executionContext)
 }

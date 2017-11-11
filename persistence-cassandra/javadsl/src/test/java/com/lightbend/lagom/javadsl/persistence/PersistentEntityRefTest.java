@@ -25,8 +25,8 @@ import java.util.concurrent.ExecutionException;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+
 import play.Application;
-import play.Configuration;
 import play.inject.Injector;
 import play.inject.guice.GuiceApplicationBuilder;
 import scala.concurrent.duration.FiniteDuration;
@@ -47,11 +47,12 @@ public class PersistentEntityRefTest {
         "akka.actor.provider = akka.cluster.ClusterActorRefProvider \n" +
         "akka.remote.netty.tcp.port = 0 \n" +
         "akka.remote.netty.tcp.hostname = 127.0.0.1 \n" +
-        "akka.loglevel = INFO \n")
+        "akka.loglevel = INFO \n" +
+        "akka.cluster.sharding.distributed-data.durable.keys = [] \n")
         .withFallback(TestUtil.persistenceConfig("PersistentEntityRefTest", CassandraLauncher.randomPort()));
 
     application = new GuiceApplicationBuilder()
-            .configure(new Configuration(config))
+            .configure(config)
             .build();
     injector = application.injector();
 
@@ -60,7 +61,7 @@ public class PersistentEntityRefTest {
     Cluster.get(system).join(Cluster.get(system).selfAddress());
 
     File cassandraDirectory = new File("target/PersistentEntityRefTest");
-    CassandraLauncher.start(cassandraDirectory, CassandraLauncher.DefaultTestConfigResource(), true, 0);
+    CassandraLauncher.start(cassandraDirectory, "lagom-test-embedded-cassandra.yaml", true, 0);
     TestUtil.awaitPersistenceInit(system);
 
   }

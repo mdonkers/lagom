@@ -1,6 +1,3 @@
-/*
- * Copyright (C) 2016-2017 Lightbend Inc. <https://www.lightbend.com>
- */
 package ${package}.${service2Name}.impl;
 
 import com.google.inject.AbstractModule;
@@ -15,8 +12,10 @@ public class ${service2ClassName}Module extends AbstractModule implements Servic
   @Override
   protected void configure() {
     // Bind the ${service2ClassName}Service service
-    bindServices(serviceBinding(${service2ClassName}Service.class, ${service2ClassName}ServiceImpl.class));
+    bindService(${service2ClassName}Service.class, ${service2ClassName}ServiceImpl.class);
     // Bind the ${service1ClassName}Service client
     bindClient(${service1ClassName}Service.class);
+    // Bind the subscriber eagerly to ensure it starts up
+    bind(${service2ClassName}Subscriber.class).asEagerSingleton();
   }
 }

@@ -8,7 +8,7 @@ To publish data to a topic a service needs to declare the topic in its [[service
 
 @[hello-service](code/docs/javadsl/mb/HelloService.java)
 
-The syntax for declaring a topic is similar to the one used already to define services' endpoints. The [`Descriptor.publishing`](api/index.html?com/lightbend/lagom/javadsl/api/Descriptor.html#publishing-com.lightbend.lagom.javadsl.api.Descriptor.TopicCall...-) method accepts a sequence of topic calls, each topic call can be defined via the [`Service.topic`](api/index.html?com/lightbend/lagom/javadsl/api/Service.html#topic-java.lang.String-java.lang.reflect.Method-) static method. The latter takes a topic name (i.e., the topic identifier), and a reference to a method that returns a [`Topic`](api/index.html?com/lightbend/lagom/javadsl/api/broker/Topic.html) instance.
+The syntax for declaring a topic is similar to the one used already to define services' endpoints. The [`Descriptor.withTopics`](api/index.html?com/lightbend/lagom/javadsl/api/Descriptor.html#withTopics-com.lightbend.lagom.javadsl.api.Descriptor.TopicCall...-) method accepts a sequence of topic calls, each topic call can be defined via the [`Service.topic`](api/index.html?com/lightbend/lagom/javadsl/api/Service.html#topic-java.lang.String-java.lang.reflect.Method-) static method. The latter takes a topic name (i.e., the topic identifier), and a reference to a method that returns a [`Topic`](api/index.html?com/lightbend/lagom/javadsl/api/broker/Topic.html) instance.
 
 Data flowing through a topic is serialized to JSON by default. Of course, it is possible to use a different serialization format, and you can do so by passing a different message serializer for each topic defined in a service descriptor. For instance, using the above service definition, here is how you could have passed a custom serializer: `topic("greetings", this::greetingsTopic).withMessageSerializer(<your-custom-serializer>)`.
 
@@ -18,7 +18,7 @@ Kafka will distribute messages for a particular topic across many partitions, so
 
 Lagom allows this by allowing you to configure a partition key strategy, which extracts the partition key out of a message. Kafka will then use this key to help decide what partition to send each message to. The partition can be selected using the [`partitionKeyStrategy`](api/index.html?com/lightbend/lagom/javadsl/api/broker/kafka/KafkaProperties.html#partitionKeyStrategy--) property, by passing a [`PartitionKeyStrategy`](api/index.html?com/lightbend/lagom/javadsl/api/broker/kafka/PartitionKeyStrategy.html) to it: 
 
-@[publishing](code/docs/javadsl/mb/BlogPostService.java)
+@[withTopics](code/docs/javadsl/mb/BlogPostService.java)
 
 ## Implementing a topic
 
@@ -52,15 +52,24 @@ When calling [`Topic.subscribe()`](api/index.html?com/lightbend/lagom/javadsl/ap
 
 Finally, subscribers are grouped together via [`Subscriber.withGroupId`](api/index.html?com/lightbend/lagom/javadsl/api/broker/Subscriber.html#withGroupId-java.lang.String-). A subscriber group allows many nodes in your cluster to consume a message stream while ensuring that each message is only handled once by each node in your cluster.  Without subscriber groups, all of your nodes for a particular service would get every message in the stream, leading to their processing being duplicated.  By default, Lagom will use a group id that has the same name as the service consuming the topic.
 
+### Consuming message metadata
+
+Your broker implementation may provide additional metadata with messages which you can consume. This can be accessed by invoking the [`Subscriber.withMetadata()`](api/index.html?com/lightbend/lagom/javadsl/api/broker/Subscriber.html#withMetadata--) method, which returns a subscriber that wraps the messages in a [`Message`](api/index.html?com/lightbend/lagom/javadsl/api/broker/Message.html).
+
+@[subscribe-to-topic-with-metadata](code/docs/javadsl/mb/AnotherServiceImpl.java)
+
+The [`messageKeyAsString`](api/index.html?com/lightbend/lagom/javadsl/api/broker/Message.html#messageKeyAsString--) method is provided as a convenience for accessing the message key. Other properties can be accessed using the [`get`](api/index.html?com/lightbend/lagom/javadsl/api/broker/Message.html#get-com.lightbend.lagom.javadsl.api.broker.MetadataKey-) method. A full list of the metadata keys available for Kafka can be found [here](api/index.html?com/lightbend/lagom/javadsl/broker/kafka/KafkaMetadataKeys.html).
+
+
 ## Polymorphic event streams
 
-Typically you will want to publish more than one type of event to a particular topic. This can be done by creating an interface that each event implements, and then making the events implement that. In order to successfully serialize these events to and from JSON, a few extra annotations are needed to instruct Jackson to describe and consume the type of the event in the produced JSON.
+Typically you will want to publish more than one type of event to a particular topic. This can be done by creating an interface that each event implements. In order to successfully serialize these events to and from JSON, a few extra annotations are needed to instruct Jackson to describe and consume the type of the event in the produced JSON.
 
 For example, consider a situation where you have a blog post created event and a blog post published event. Here's what your event structure might look like:
 
 @[content](code/docs/javadsl/mb/BlogPostEvent.java)
 
-The `@JsonTypeInfo` annotation describes how the type of the event will be serialised. In this case, it's saying each event type will be identified by it's name, and that name will go into a property called `type`. The `@JsonTypeName` on each event subclass says what the name of that event should be. And the `@JsonSubTypes` annotation is used to tell Jackson what the possible sub types of the event are, so that it knows where to look when deserializing.
+The `@JsonTypeInfo` annotation describes how the type of the event will be serialised. In this case, it's saying each event type will be identified by its name, and that name will go into a property called `type`. The `@JsonTypeName` on each event subclass says what the name of that event should be. And the `@JsonSubTypes` annotation is used to tell Jackson what the possible sub types of the event are, so that it knows where to look when deserializing.
 
 The resulting JSON for the `BlogPostCreated` event will look like this:
 

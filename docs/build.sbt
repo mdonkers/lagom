@@ -1,6 +1,14 @@
+val ScalaVersion = "2.11.11"
 
-val PlayVersion = "2.5.4"
-val AkkaVersion = "2.4.12"
+val AkkaVersion = "2.5.6"
+val JUnitVersion = "4.11"
+val JUnitInterfaceVersion = "0.11"
+val ScalaTestVersion = "3.0.4"
+val PlayVersion = "2.6.7"
+val Log4jVersion = "2.8.2"
+val MacWireVersion = "2.3.0"
+val LombokVersion = "1.16.10"
+val HibernateVersion = "5.2.5.Final"
 
 val branch = {
   val rev = "git rev-parse --abbrev-ref HEAD".!!.trim
@@ -10,25 +18,26 @@ val branch = {
   } else rev
 }
 
+
 lazy val docs = project
   .in(file("."))
   .enablePlugins(LightbendMarkdown)
   .settings(forkedTests: _*)
   .settings(
     resolvers += Resolver.typesafeIvyRepo("releases"),
-    scalaVersion := "2.11.7",
+    scalaVersion := ScalaVersion,
     libraryDependencies ++= Seq(
       "com.typesafe.akka" %% "akka-stream-testkit" % AkkaVersion % "test",
-      "org.apache.cassandra" % "cassandra-all" % "3.0.2" % "test",
-      "junit" % "junit" % "4.12" % "test",
-      "com.novocode" % "junit-interface" % "0.11" % "test",
-      "org.scalatest" %% "scalatest" % "3.0.1" % Test,
+      "junit" % "junit" % JUnitVersion % "test",
+      "com.novocode" % "junit-interface" % JUnitInterfaceVersion % "test",
+      "org.scalatest" %% "scalatest" % ScalaTestVersion % Test,
       "com.typesafe.play" %% "play-netty-server" % PlayVersion % Test,
       "com.typesafe.play" %% "play-logback" % PlayVersion % Test,
-      "org.apache.logging.log4j" % "log4j-api" % "2.7" % "test",
-      "com.softwaremill.macwire" %% "macros" % "2.2.5" % "provided",
-      "org.projectlombok" % "lombok" % "1.16.10",
-      "org.hibernate" % "hibernate-core" % "5.2.5.Final"
+      "org.apache.logging.log4j" % "log4j-api" % Log4jVersion % "test",
+      "com.softwaremill.macwire" %% "macros" % MacWireVersion % "provided",
+      "org.projectlombok" % "lombok" % LombokVersion,
+      "org.hibernate" % "hibernate-core" % HibernateVersion,
+      "org.hibernate" % "hibernate-validator" % HibernateVersion
     ),
     javacOptions ++= Seq("-encoding", "UTF-8", "-source", "1.8", "-target", "1.8", "-parameters", "-Xlint:unchecked", "-Xlint:deprecation"),
     testOptions in Test += Tests.Argument("-oDF"),
@@ -70,9 +79,8 @@ lazy val docs = project
     persistenceJdbcScaladsl,
     testkitJavadsl,
     testkitScaladsl,
-    brokerScaladsl,
+    kafkaBrokerScaladsl,
     playJson,
-    kafkaBroker,
     pubsubScaladsl,
     immutables % "test->compile",
     theme % "run-markdown",
@@ -91,8 +99,7 @@ lazy val persistenceCassandraScaladsl = ProjectRef(parentDir, "persistence-cassa
 lazy val testkitJavadsl = ProjectRef(parentDir, "testkit-javadsl")
 lazy val testkitScaladsl = ProjectRef(parentDir, "testkit-scaladsl")
 lazy val playJson = ProjectRef(parentDir, "play-json")
-lazy val kafkaBroker = ProjectRef(parentDir, "kafka-broker")
-lazy val brokerScaladsl = ProjectRef(parentDir, "broker-scaladsl")
+lazy val kafkaBrokerScaladsl = ProjectRef(parentDir, "kafka-broker-scaladsl")
 lazy val devmodeScaladsl = ProjectRef(parentDir, "devmode-scaladsl")
 lazy val pubsubScaladsl = ProjectRef(parentDir, "pubsub-scaladsl")
 
@@ -104,7 +111,7 @@ def forkedTests: Seq[Setting[_]] = Seq(
   fork in Test := true,
   concurrentRestrictions in Global += Tags.limit(Tags.Test, 1),
   javaOptions in Test ++= Seq("-Xms256M", "-Xmx512M"),
-  testGrouping in Test <<= definedTests in Test map singleTestsGrouping
+  testGrouping in Test := (definedTests in Test map singleTestsGrouping).value
 )
 
 // group tests, a single test per group
@@ -125,7 +132,7 @@ lazy val theme = project
   .enablePlugins(SbtWeb, SbtTwirl)
   .settings(
     name := "lagom-docs-theme",
-    scalaVersion := "2.11.7",
+    scalaVersion := ScalaVersion,
     resolvers += Resolver.typesafeIvyRepo("releases"),
     libraryDependencies ++= Seq(
       "com.lightbend.markdown" %% "lightbend-markdown-server" % LightbendMarkdownVersion

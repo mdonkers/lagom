@@ -21,6 +21,16 @@ case class Event2(name: String, inner: Inner)
 case class Inner(on: Boolean)
 case class MigratedEvent(addedField: Int, newName: String)
 
+case class Name(name: String)
+
+object Name {
+  implicit val format: Format[Name] = new Format[Name] {
+    override def writes(o: Name): JsValue = JsString(o.toString)
+
+    override def reads(js: JsValue): JsResult[Name] = js.validate[String].map(Name.apply)
+  }
+}
+
 object TestRegistry1 extends JsonSerializerRegistry {
 
   implicit val innerFormat = Json.format[Inner]
@@ -58,7 +68,8 @@ object TestRegistry2 extends JsonSerializerRegistry {
           (__ \ "addedField").json.update(Format.of[JsString].map { case JsString(value) => JsNumber(value.toInt) })
       )
     ),
-    JsonMigrations.renamed("event1.old.ClassName", inVersion = 2, toClass = classOf[Event1])
+    JsonMigrations.renamed("event1.old.ClassName", inVersion = 2, toClass = classOf[Event1]),
+    JsonMigrations.renamed("MigratedEvent.old.ClassName", inVersion = 2, toClass = classOf[MigratedEvent])
   )
 }
 
@@ -95,6 +106,24 @@ object TestRegistry3 extends JsonSerializerRegistry {
         toUpdate
       }
     }
+  )
+}
+
+object TestRegistryWithCompression extends JsonSerializerRegistry {
+
+  implicit val innerFormat = Json.format[Inner]
+
+  override def serializers: Seq[JsonSerializer[_]] =
+    Seq(
+      JsonSerializer.compressed[Event1],
+      JsonSerializer.compressed(Json.format[Event2])
+    )
+
+}
+
+object TestRegistryWithJson extends JsonSerializerRegistry {
+  override def serializers: Seq[JsonSerializer[_]] = Seq(
+    JsonSerializer(Json.format[Name])
   )
 }
 
@@ -216,6 +245,58 @@ class PlayJsonSerializerSpec extends WordSpec with Matchers {
 
     }
 
+    "apply rename migration and then use new name to apply migration transformations" in withActorSystem(TestRegistry2) { system =>
+
+      val expectedEvent = MigratedEvent(addedField = 2, newName = "some value")
+      val oldJsonBytes = Json.stringify(JsObject(Seq(
+        "removedField" -> JsString("doesn't matter"),
+        "oldName" -> JsString("some value")
+      ))).getBytes(StandardCharsets.UTF_8)
+
+      val serializeExt = SerializationExtension(system)
+      val serializer = serializeExt.findSerializerFor(expectedEvent).asInstanceOf[SerializerWithStringManifest]
+
+      val deserialized = serializer.fromBinary(oldJsonBytes, "MigratedEvent.old.ClassName")
+
+      deserialized should be(expectedEvent)
+    }
+
+    "use compression when enabled and payload is bigger than threshold" in withActorSystem(TestRegistryWithCompression) { system =>
+
+      val serializeExt = SerializationExtension(system)
+      val longContent = "test" * 1024
+      val bigEvent1 = Event1(longContent, 1)
+      val bigEvent2 = Event2(longContent, Inner(on = true))
+      val shortContent = "clearText-short"
+      val smallEvent1 = Event1(shortContent, 1)
+      val smallEvent2 = Event2(shortContent, Inner(on = true))
+      List(bigEvent1, bigEvent2).foreach { event =>
+        val serializer = serializeExt.findSerializerFor(event).asInstanceOf[SerializerWithStringManifest]
+
+        val bytes = serializer.toBinary(event)
+        bytes.length should be < 1024 // this is a magic number. I know longContent will compress well under this 1024.
+        Compression.isGZipped(bytes) should be(true)
+        val manifest = serializer.manifest(event)
+
+        bytes.isEmpty should be(false)
+
+        val deserialized = serializer.fromBinary(bytes, manifest)
+        deserialized should be(event)
+      }
+      List(smallEvent1, smallEvent2).foreach { event =>
+        val serializer = serializeExt.findSerializerFor(event).asInstanceOf[SerializerWithStringManifest]
+
+        val bytes = serializer.toBinary(event)
+        new String(bytes) should include(shortContent)
+        val manifest = serializer.manifest(event)
+
+        bytes.isEmpty should be(false)
+
+        val deserialized = serializer.fromBinary(bytes, manifest)
+        deserialized should be(event)
+      }
+    }
+
     def expectedVersionedManifest[T](clazz: Class[T], migrationVersion: Int) = {
       s"${clazz.getName}#$migrationVersion"
     }
@@ -232,6 +313,18 @@ class PlayJsonSerializerSpec extends WordSpec with Matchers {
       val result = serializer.reads(serializer.writes(Singleton))
       result.isSuccess shouldBe true
       result.get shouldBe Singleton
+    }
+
+    "serialize and deserialize JsValues" in withActorSystem(TestRegistryWithJson) { system =>
+      val event = Name("hello, world")
+
+      val serializeExt = SerializationExtension(system)
+      val serializer = serializeExt.findSerializerFor(event).asInstanceOf[SerializerWithStringManifest]
+      val manifest = serializer.manifest(event)
+      val bytes = serializer.toBinary(event)
+
+      val res = serializer.fromBinary(bytes, manifest)
+      assert(res == event)
     }
 
   }

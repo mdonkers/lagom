@@ -19,18 +19,16 @@ import com.lightbend.lagom.internal.testkit.{ TestServiceLocator, TestServiceLoc
 import com.lightbend.lagom.javadsl.api.Service
 import com.lightbend.lagom.javadsl.api.ServiceLocator
 import com.lightbend.lagom.javadsl.persistence.PersistenceModule
-import com.lightbend.lagom.javadsl.persistence.testkit.TestUtil
 import akka.actor.ActorSystem
 import akka.japi.function.Effect
 import akka.japi.function.Procedure
 import akka.persistence.cassandra.testkit.CassandraLauncher
 import akka.stream.Materializer
 import com.lightbend.lagom.internal.javadsl.api.broker.TopicFactory
+import com.lightbend.lagom.internal.javadsl.persistence.testkit.CassandraTestConfig
 import com.lightbend.lagom.javadsl.pubsub.PubSubModule
 import com.lightbend.lagom.spi.persistence.{ InMemoryOffsetStore, OffsetStore }
-import org.apache.cassandra.io.util.FileUtils
 import play.Application
-import play.Configuration
 import play.api.Logger
 import play.api.Mode
 import play.api.Play
@@ -67,6 +65,8 @@ object ServiceTest {
   private val CassandraPersistenceModule = "com.lightbend.lagom.javadsl.persistence.cassandra.CassandraPersistenceModule"
   private val KafkaBrokerModule = "com.lightbend.lagom.internal.javadsl.broker.kafka.KafkaBrokerModule"
   private val KafkaClientModule = "com.lightbend.lagom.javadsl.broker.kafka.KafkaClientModule"
+
+  private val LagomTestConfigResource: String = "lagom-test-embedded-cassandra.yaml"
 
   sealed trait Setup {
     @deprecated(message = "Use withCassandra instead", since = "1.2.0")
@@ -205,7 +205,7 @@ object ServiceTest {
 
   /**
    * Start the test server with the given `setup` and run the `block` (lambda). When
-   * the `block returns or throws the test server will automatically be stopped.
+   * the `block` returns or throws the test server will automatically be stopped.
    *
    * This method should be used when the server can be started and stopped for each test
    * method. When your test have several test methods, and especially when using persistence, it is
@@ -233,7 +233,7 @@ object ServiceTest {
    *
    * When your test have several test methods, and especially when using persistence, it is
    * faster to only start the server once in a static method annotated with `@BeforeClass`
-   * and stop it in a method annotated with `@AfterClass`. Otherwise [[#withServer withServer]] is
+   * and stop it in a method annotated with `@AfterClass`. Otherwise [[#withServer]] is
    * more convenient.
    *
    * You can get the service client from the returned `TestServer`.
@@ -257,15 +257,15 @@ object ServiceTest {
       if (setup.cassandra) {
         val cassandraPort = CassandraLauncher.randomPort
         val cassandraDirectory = Files.createTempDirectory(testName).toFile
-        FileUtils.deleteRecursiveOnExit(cassandraDirectory)
         val t0 = System.nanoTime()
-        CassandraLauncher.start(cassandraDirectory, CassandraLauncher.DefaultTestConfigResource, clean = false, port = 0)
+        CassandraLauncher.start(cassandraDirectory, LagomTestConfigResource, clean = false, port = cassandraPort,
+          CassandraLauncher.classpathForResources(LagomTestConfigResource))
         log.debug(s"Cassandra started in ${TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0)} ms")
-        val b2 = b1.configure(new Configuration(TestUtil.persistenceConfig(testName, cassandraPort, useServiceLocator = false)))
+        val b2 = b1.configure(CassandraTestConfig.persistenceConfig(testName, cassandraPort))
           .configure("lagom.cluster.join-self", "on")
         disableModules(b2, KafkaClientModule, KafkaBrokerModule)
       } else if (setup.cluster) {
-        val b2 = b1.configure(new Configuration(TestUtil.clusterConfig))
+        val b2 = b1.configure(CassandraTestConfig.clusterConfig)
           .configure("lagom.cluster.join-self", "on")
           .disable(classOf[PersistenceModule])
           .bindings(play.api.inject.bind[OffsetStore].to[InMemoryOffsetStore])
@@ -287,7 +287,7 @@ object ServiceTest {
 
     if (setup.cassandra) {
       val system = application.injector().instanceOf(classOf[ActorSystem])
-      TestUtil.awaitPersistenceInit(system)
+      CassandraTestConfig.awaitPersistenceInit(system)
     }
 
     new TestServer(assignedPort, application, srv)

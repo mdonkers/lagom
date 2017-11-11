@@ -29,11 +29,14 @@ import org.scalatest.concurrent.ScalaFutures
 
 class PersistentEntityRefSpec extends WordSpecLike with Matchers with BeforeAndAfterAll with ScalaFutures with ConversionCheckedTripleEquals {
 
+  override implicit val patienceConfig = PatienceConfig(5.seconds, 150.millis)
+
   val config: Config = ConfigFactory.parseString("""
       akka.actor.provider = akka.cluster.ClusterActorRefProvider
       akka.remote.netty.tcp.port = 0
       akka.remote.netty.tcp.hostname = 127.0.0.1
       akka.loglevel = INFO
+      akka.cluster.sharding.distributed-data.durable.keys = []
   """).withFallback(TestUtil.persistenceConfig("PersistentEntityRefTest", CassandraLauncher.randomPort))
   private val system: ActorSystem = ActorSystem("PersistentEntityRefSpec", ActorSystemSetup(
     BootstrapSetup(config),
@@ -45,7 +48,7 @@ class PersistentEntityRefSpec extends WordSpecLike with Matchers with BeforeAndA
 
     Cluster.get(system).join(Cluster.get(system).selfAddress)
     val cassandraDirectory: File = new File("target/PersistentEntityRefTest")
-    CassandraLauncher.start(cassandraDirectory, CassandraLauncher.DefaultTestConfigResource, true, 0)
+    CassandraLauncher.start(cassandraDirectory, "lagom-test-embedded-cassandra.yaml", true, 0)
     TestUtil.awaitPersistenceInit(system)
   }
 
@@ -62,7 +65,7 @@ class PersistentEntityRefSpec extends WordSpecLike with Matchers with BeforeAndA
     override type State = String
 
     def initialState: String = ""
-    override def behavior = Actions()
+    override def behavior = Actions.empty
   }
 
   val components = new CassandraPersistenceComponents {
@@ -79,8 +82,6 @@ class PersistentEntityRefSpec extends WordSpecLike with Matchers with BeforeAndA
     reg.register(new TestEntity(system))
     reg
   }
-
-  implicit val patience = PatienceConfig(5.seconds, 100.millis)
 
   "The Cassandra persistence backend" should {
 

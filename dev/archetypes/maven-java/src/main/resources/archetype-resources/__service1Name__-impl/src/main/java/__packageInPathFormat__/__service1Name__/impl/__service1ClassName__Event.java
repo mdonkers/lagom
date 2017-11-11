@@ -1,10 +1,10 @@
-/*
- * Copyright (C) 2016-2017 Lightbend Inc. <https://www.lightbend.com>
- */
 package ${package}.${service1Name}.impl;
 
-import javax.annotation.Nullable;
-import javax.annotation.concurrent.Immutable;
+import com.lightbend.lagom.javadsl.persistence.AggregateEvent;
+import com.lightbend.lagom.javadsl.persistence.AggregateEventShards;
+import com.lightbend.lagom.javadsl.persistence.AggregateEventTag;
+import com.lightbend.lagom.javadsl.persistence.AggregateEventTagger;
+import lombok.Value;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
@@ -18,41 +18,38 @@ import com.lightbend.lagom.serialization.Jsonable;
  * By convention, the events should be inner classes of the interface, which
  * makes it simple to get a complete picture of what events an entity has.
  */
-public interface ${service1ClassName}Event extends Jsonable {
+public interface ${service1ClassName}Event extends Jsonable, AggregateEvent<${service1ClassName}Event> {
+
+  /**
+   * Tags are used for getting and publishing streams of events. Each event
+   * will have this tag, and in this case, we are partitioning the tags into
+   * 4 shards, which means we can have 4 concurrent processors/publishers of
+   * events.
+   */
+  AggregateEventShards<${service1ClassName}Event> TAG = AggregateEventTag.sharded(${service1ClassName}Event.class, 4);
 
   /**
    * An event that represents a change in greeting message.
    */
   @SuppressWarnings("serial")
-  @Immutable
+  @Value
   @JsonDeserialize
   public final class GreetingMessageChanged implements ${service1ClassName}Event {
+
+    public final String name;
     public final String message;
 
     @JsonCreator
-    public GreetingMessageChanged(String message) {
+    public GreetingMessageChanged(String name, String message) {
+      this.name = Preconditions.checkNotNull(name, "name");
       this.message = Preconditions.checkNotNull(message, "message");
     }
-
-    @Override
-    public boolean equals(@Nullable Object another) {
-      return this == another || another instanceof GreetingMessageChanged && equalTo((GreetingMessageChanged) another);
-    }
-
-    private boolean equalTo(GreetingMessageChanged another) {
-      return message.equals(another.message);
-    }
-
-    @Override
-    public int hashCode() {
-      int h = 31;
-      h = h * 17 + message.hashCode();
-      return h;
-    }
-
-    @Override
-    public String toString() {
-      return MoreObjects.toStringHelper("GreetingMessageChanged").add("message", message).toString();
-    }
   }
+
+
+  @Override
+  default AggregateEventTagger<${service1ClassName}Event> aggregateTag() {
+    return TAG;
+  }
+
 }

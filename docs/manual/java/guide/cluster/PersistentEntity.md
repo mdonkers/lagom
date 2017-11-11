@@ -4,7 +4,7 @@
 
 A `PersistentEntity` has a stable entity identifier, with which it can be accessed from the service implementation or other places. The state of an entity is persistent (durable) using [Event Sourcing](https://msdn.microsoft.com/en-us/library/jj591559.aspx). We represent all state changes as events and those immutable facts are appended to an event log. To recreate the current state of an entity when it is started we replay these events.
 
-A persistent entity corresponds to an [Aggregate Root](http://martinfowler.com/bliki/DDD_Aggregate.html) in Domain-Driven Design terms. Each instance has a stable identifier and for a given id there will only be one instance of the entity. Lagom takes care of distributing those instances across the cluster of the service. If you know the identifier you can send messages, so called commands, to the entity.
+A persistent entity corresponds to an [Aggregate Root](https://martinfowler.com/bliki/DDD_Aggregate.html) in Domain-Driven Design terms. Each instance has a stable identifier and for a given id there will only be one instance of the entity. Lagom takes care of distributing those instances across the cluster of the service. If you know the identifier you can send messages, so called commands, to the entity.
 
 The persistent entity is also a transaction boundary. Invariants can be maintained within one entity but not across several entities.
 
@@ -26,7 +26,7 @@ Lagom supports the following databases:
 * [PostgreSQL](https://www.postgresql.org/)
 * [MySQL](https://www.mysql.com/)
 * [Oracle](https://www.oracle.com/database/index.html)
-* [H2](http://www.h2database.com/)
+* [H2](https://www.h2database.com/)
 
 We recommend using Cassandra. Cassandra is a very scalable distributed database, and it is also flexible enough to support typical use cases of reactive services. In contrast to most relational databases, it natively supports sharding and replication, and is emerging as an industry standard open source NoSQL database.
 
@@ -78,7 +78,7 @@ The `setReadOnlyCommandHandler` is simply a convenience function that avoids you
 
 The commands must be immutable to avoid concurrency issues that may occur from changing a command instance that has been sent.
 
-The section [[Immutable Objects|Immutable]] describes how to define immutable command classes.  
+The section [[Immutable Objects|Immutable]] describes how to define immutable command classes.
 
 ## Event Handlers
 
@@ -86,7 +86,7 @@ When an event has been persisted successfully the current state is updated by ap
 
 @[event-handler](code/docs/home/persistence/Post2.java)
 
-You should define one event handler for each event class that the entity can persists.
+You should define one event handler for each event class that the entity can persist.
 
 The event handler returns the new state. The state must be immutable, so you return a new instance of the state. Current state can be accessed from the event handler with the `state` method of the `PersistentEntity`. The same event handlers are also used when the entity is started up to recover its state from the stored events.
 
@@ -100,7 +100,7 @@ Each command must define what type of message to use as reply to the command by 
 
 @[AddPost](code/docs/home/persistence/BlogCommand.java)
 
-You send the reply message using the `reply` method of the context that is passed to the command handler function.  
+You send the reply message using the `reply` method of the context that is passed to the command handler function.
 
 Typically the reply will be an acknowledgment that the entity processed the command successfully, i.e. you send it after persist.
 
@@ -118,7 +118,7 @@ You can send a negative acknowledgment with `ctx.commandFailed`, which will fail
 
 If persisting the events fails a negative acknowledgment is automatically sent, which will fail the `CompletionStage` on the sender side with `PersistentEntity.PersistException`.
 
-If the `PersistentEntity` receives a command for which there is no registered command handler a negative acknowledgment is automatically sent, which will fail the the `CompletionStage` on the sender side with `PersistentEntity.UnhandledCommandException`.
+If the `PersistentEntity` receives a command for which there is no registered command handler a negative acknowledgment is automatically sent, which will fail the `CompletionStage` on the sender side with `PersistentEntity.UnhandledCommandException`.
 
 If you don't reply to a command the `CompletionStage` on the sender side will be completed with a `akka.pattern.AskTimeoutException` after a timeout.
 

@@ -16,7 +16,7 @@ Having bound the client, you can now use it anywhere in your Lagom application. 
 
 ## Circuit Breakers
 
-A [circuit breaker](http://martinfowler.com/bliki/CircuitBreaker.html) is used to provide stability and prevent cascading failures in distributed systems. These should be used in conjunction with judicious timeouts at the interfaces between services to prevent the failure of a single service from bringing down other services.
+A [circuit breaker](https://martinfowler.com/bliki/CircuitBreaker.html) is used to provide stability and prevent cascading failures in distributed systems. These should be used in conjunction with judicious timeouts at the interfaces between services to prevent the failure of a single service from bringing down other services.
 
 As an example, we have a web application interacting with a third-party web service. Let's say the third-party has oversold their capacity and their database melts down under load. Assume that the database fails in such a way that it takes a very long time to hand back an error to the third-party web service. This in turn makes calls fail after a long period of time. Back to our web application, the users have noticed that their form submissions take much longer seeming to hang. The users do what they know to do which is use the refresh button, adding more requests to their already running requests. This eventually causes the failure of the web application due to resource exhaustion.
 
@@ -48,27 +48,31 @@ All service calls with Lagom service clients are by default using circuit breake
 
 @[circuit-breaker](code/ServiceClients.scala)
 
-In the above example the default identifer is used for the `sayHi` method, since no specific identifier is given. The default identifier is the same as the service name, i.e. `"hello"` in this example. The `hiAgain` method will use another circuit breaker instance, since `"hello2"` is specified as circuit breaker identifier.
+In the above example the default identifier is used for the `sayHi` method, since no specific identifier is given. The default identifier is the same as the service name, i.e. `"hello"` in this example. The `hiAgain` method will use another circuit breaker instance, since `"hello2"` is specified as circuit breaker identifier.
+
+### Circuit Breaker Configuration
 
 On the client side you can configure the circuit breakers. The default configuration is:
 
 @[circuit-breaker-default](../../../../../service/core/client/src/main/resources/reference.conf)
 
-That configuration will be used if you don't define any configuration yourself. 
+That configuration will be used if you don't define any configuration yourself. The settings to configure a circuit breaker include the general settings you'd expect in a circuit breaker like the number of failures or the request timeout that should open the circuit as well as the timeout that must lapse to close the circuit again. In lagom there's an extra setting to control what is considered a failure.
+
+Lagom's client [[maps all 4xx and 5xx responses to Exceptions|ServiceErrorHandling]] and Lagom's Circuit Breaker defaults to considering all Exceptions as failures. You can change the default behavior by whitelisting particular exceptions so they do not count as failures. Sometimes you want to configure the circuit breaker for a given endpoint so it ignores a certain exception. This is particularly useful when connecting to services where 4xx HTTP status codes are used to model business valid cases. For example, it may be a non-failure case to respond a 404 Not Found to a particular request. In that case you can add `"com.lightbend.lagom.scaladsl.api.transport.NotFound"` to the circuit breaker whitelist so that it is not considered a failure. Even if the `NotFound` exception is not counted as a failure, the client will still throw a `NotFound` exception as a result of invoking the service.
 
 With the above "hello" example we could adjust the configuration by defining properties in `application.conf` such as:
 
     lagom.circuit-breaker {
-    
+
       # will be used by sayHi method
       hello.max-failures = 5
-      
+
       # will be used by hiAgain method
       hello2 {
         max-failures = 7
         reset-timeout = 30s
       }
-    
+
       # Change the default call-timeout
       # will be used for both sayHi and hiAgain methods
       default.call-timeout = 5s
@@ -76,7 +80,8 @@ With the above "hello" example we could adjust the configuration by defining pro
 
 ### Circuit breaker metrics
 
-Lagom allows you to publish metrics for circuit breakers via a metrics service. To enable this service, mix in the [`MetricsServiceComponents`](api/com/lightbend/lagom/scaladsl/server/status/MetricsServiceComponents.html) trait into your application, and add the provided `metricsServiceBinding` to your service bindings in your `lagomServer` declaration, like so:
+
+Lagom allows you to publish metrics for circuit breakers via a metrics service. To enable this service, add `metricsServiceBinding` to your service bindings in your `lagomServer` declaration, like so:
 
 @[metrics-service](code/ServiceClients.scala)
 
@@ -86,4 +91,3 @@ The service provides the following endpoints:
 * `/_status/circuit-breaker/stream` - Stream of circuit breaker status
 
 [Lightbend Monitoring](https://www.lightbend.com/products/monitoring) will provide metrics for Lagom circuit breakers, including aggregated views of the information for all nodes in the cluster.
-

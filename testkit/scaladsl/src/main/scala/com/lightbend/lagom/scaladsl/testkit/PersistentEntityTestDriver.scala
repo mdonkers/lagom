@@ -137,8 +137,6 @@ class PersistentEntityTestDriver[C, E, S](
       entity.PersistNone
   }
 
-  def runOne[CC <: entity.Command](command: C): Outcome[E, S] = ???
-
   /**
    * The entity will process the commands and the emitted events and side effects
    * are recorded and provided in the returned `Outcome`. Current state is also
@@ -232,7 +230,7 @@ class PersistentEntityTestDriver[C, E, S](
   def getAllIssues: immutable.Seq[Issue] = allIssues
 
   private val unhandledEvent: PartialFunction[(E, S), S] = {
-    case event =>
+    case (event, _) =>
       issues :+= UnhandledEvent(event)
       state
   }
@@ -245,7 +243,7 @@ class PersistentEntityTestDriver[C, E, S](
   private def checkSerialization(obj: Any): Option[Issue] = {
     val obj1 = obj.asInstanceOf[AnyRef]
     // check that it is configured
-    Try(serialization.serializerFor(obj.getClass)) match {
+    Try(serialization.findSerializerFor(obj1)) match {
       case Failure(e) => Some(NoSerializer(obj, e))
       case Success(serializer) =>
         // verify serialization-deserialization round trip

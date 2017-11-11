@@ -15,7 +15,6 @@
         <module>${service2Name}-api</module>
         <module>${service2Name}-impl</module>
         <module>integration-tests</module>
-        <module>cassandra-config</module>
     </modules>
 
     <build>
@@ -78,6 +77,11 @@
                 <groupId>com.typesafe.conductr</groupId>
                 <artifactId>${conductr.lib.name}</artifactId>
                 <version>1.4.7</version>
+            </dependency>
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>1.16.10</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
