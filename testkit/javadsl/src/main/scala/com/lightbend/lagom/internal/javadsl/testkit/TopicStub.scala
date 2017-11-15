@@ -25,5 +25,6 @@ private[lagom] class TopicStub[T](val topicId: Topic.TopicId, topicBuffer: Actor
     override def withGroupId(groupId: String): Subscriber[T] = new SubscriberStub(groupId, topicBuffer)
     override def atMostOnceSource(): Source[T, _] = super.mostOnceSource.asJava
     override def atLeastOnce(flow: Flow[T, Done, _]): CompletionStage[Done] = toJava(super.leastOnce(flow.asScala))
+    override def atLeastOnceWithOffset(offset: Long, flow: Flow[T, Done, _]): CompletionStage[Done] = toJava(super.leastOnce(flow.asScala))
   }
 }

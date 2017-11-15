@@ -75,4 +75,5 @@ public interface Subscriber<Message> {
    */
   CompletionStage<Done> atLeastOnce(Flow<Message, Done, ?> flow);
 
+  CompletionStage<Done> atLeastOnceWithOffset(long offset, Flow<Message, Done, ?> flow);
 }

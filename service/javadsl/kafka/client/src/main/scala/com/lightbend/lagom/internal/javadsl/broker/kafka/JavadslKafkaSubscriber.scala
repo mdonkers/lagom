@@ -3,12 +3,14 @@
  */
 package com.lightbend.lagom.internal.javadsl.broker.kafka
 
+import java.lang
 import java.net.URI
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.atomic.AtomicInteger
 
 import akka.Done
 import akka.actor.{ ActorSystem, SupervisorStrategy }
+import akka.kafka.Subscriptions.TopicSubscriptionPattern
 import akka.kafka.{ ConsumerSettings, Subscriptions }
 import akka.kafka.scaladsl.Consumer
 import akka.pattern.BackoffSupervisor
@@ -18,6 +20,7 @@ import com.lightbend.lagom.internal.broker.kafka.{ ConsumerConfig, KafkaConfig, 
 import com.lightbend.lagom.javadsl.api.Descriptor.TopicCall
 import com.lightbend.lagom.javadsl.api.{ ServiceInfo, ServiceLocator }
 import com.lightbend.lagom.javadsl.api.broker.Subscriber
+import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.slf4j.LoggerFactory
 
@@ -118,6 +121,21 @@ private[lagom] class JavadslKafkaSubscriber[Message](kafkaConfig: KafkaConfig, t
     streamCompleted.future.toJava
   }
 
+  override def atLeastOnceWithOffset(offset: Long, flow: Flow[Message, Done, _]): CompletionStage[Done] = {
+    val streamCompleted = Promise[Done]
+    val subscriptionWithOffset = Subscriptions.assignmentWithOffset(new TopicPartition(topicCall.topicId().value, 0), offset)
+    val consumerProps = KafkaSubscriberActor.props(kafkaConfig, consumerConfig, locateService,
+      topicCall.topicId().value(), flow.asScala, consumerSettings, subscriptionWithOffset, streamCompleted)
+
+    val backoffConsumerProps = BackoffSupervisor.propsWithSupervisorStrategy(
+      consumerProps, s"KafkaConsumerActor$consumerId-${topicCall.topicId().value}", consumerConfig.minBackoff,
+      consumerConfig.maxBackoff, consumerConfig.randomBackoffFactor, SupervisorStrategy.stoppingStrategy
+    )
+
+    system.actorOf(backoffConsumerProps, s"KafkaBackoffConsumer$consumerId-${topicCall.topicId().value}")
+
+    streamCompleted.future.toJava
+  }
 }
 
 private[lagom] object JavadslKafkaSubscriber {

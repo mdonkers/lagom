@@ -9,7 +9,7 @@ import akka.Done
 import akka.actor.{ Actor, ActorLogging, Props, Status }
 import akka.kafka.ConsumerMessage.{ CommittableOffset, CommittableOffsetBatch }
 import akka.kafka.scaladsl.{ Consumer => ReactiveConsumer }
-import akka.kafka.{ AutoSubscription, ConsumerSettings }
+import akka.kafka.{ ConsumerSettings, Subscription }
 import akka.pattern.pipe
 import akka.stream.scaladsl.{ Flow, GraphDSL, Keep, Sink, Source, Unzip, Zip }
 import akka.stream._
@@ -19,7 +19,7 @@ import scala.concurrent.{ ExecutionContext, Future, Promise }
 private[lagom] class KafkaSubscriberActor[Message](
   kafkaConfig: KafkaConfig, consumerConfig: ConsumerConfig,
   locateService: String => Future[Option[URI]], topicId: String, flow: Flow[Message, Done, _],
-  consumerSettings: ConsumerSettings[String, Message], subscription: AutoSubscription,
+  consumerSettings: ConsumerSettings[String, Message], subscription: Subscription,
   streamCompleted: Promise[Done]
 )(implicit mat: Materializer, ec: ExecutionContext) extends Actor with ActorLogging {
 
@@ -124,7 +124,7 @@ object KafkaSubscriberActor {
   def props[Message](
     kafkaConfig: KafkaConfig, consumerConfig: ConsumerConfig, locateService: String => Future[Option[URI]],
     topicId: String, flow: Flow[Message, Done, _],
-    consumerSettings: ConsumerSettings[String, Message], subscription: AutoSubscription,
+    consumerSettings: ConsumerSettings[String, Message], subscription: Subscription,
     streamCompleted: Promise[Done]
   )(implicit mat: Materializer, ec: ExecutionContext) =
     Props(new KafkaSubscriberActor[Message](kafkaConfig, consumerConfig, locateService, topicId, flow, consumerSettings,
