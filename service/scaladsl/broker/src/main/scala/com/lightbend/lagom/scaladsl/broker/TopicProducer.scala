@@ -50,6 +50,6 @@ object TopicProducer {
   def taggedStreamWithOffset[Message, Event <: AggregateEvent[Event]](tags: immutable.Seq[AggregateEventTag[Event]])(
     eventStream: (AggregateEventTag[Event], Offset) => Source[(Message, Offset), Any]
   ): Topic[Message] =
-    new TaggedOffsetTopicProducer[Message, Event](tags, eventStream)
+    new TaggedOffsetTopicProducer[Message, Event](tags, eventStream, None)
 
 }

@@ -3,8 +3,9 @@
  */
 package com.lightbend.internal.broker
 
+import akka.kafka.ProducerMessage
 import akka.persistence.query.Offset
-import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.{ Flow, Source }
 import com.lightbend.lagom.scaladsl.api.broker.{ Subscriber, Topic }
 import com.lightbend.lagom.scaladsl.persistence.{ AggregateEvent, AggregateEventTag }
 
@@ -19,5 +20,6 @@ trait InternalTopic[Message] extends Topic[Message] {
 
 final class TaggedOffsetTopicProducer[Message, Event <: AggregateEvent[Event]](
   val tags:           immutable.Seq[AggregateEventTag[Event]],
-  val readSideStream: (AggregateEventTag[Event], Offset) => Source[(Message, Offset), _]
+  val readSideStream: (AggregateEventTag[Event], Offset) => Source[(Message, Offset), _],
+  val readyFlow:      Option[Flow[ProducerMessage.Result[_, Message, _], ProducerMessage.Result[_, Message, _], _]]
 ) extends InternalTopic[Message]

@@ -3,30 +3,28 @@
  */
 package com.lightbend.lagom.internal.javadsl.broker.kafka
 
-import java.lang
 import java.net.URI
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.atomic.AtomicInteger
 
 import akka.Done
 import akka.actor.{ ActorSystem, SupervisorStrategy }
-import akka.kafka.Subscriptions.TopicSubscriptionPattern
-import akka.kafka.{ ConsumerSettings, Subscriptions }
 import akka.kafka.scaladsl.Consumer
+import akka.kafka.{ ConsumerSettings, Subscriptions }
 import akka.pattern.BackoffSupervisor
 import akka.stream.Materializer
 import akka.stream.javadsl.{ Flow, Source }
 import com.lightbend.lagom.internal.broker.kafka.{ ConsumerConfig, KafkaConfig, KafkaSubscriberActor, NoKafkaBrokersException }
 import com.lightbend.lagom.javadsl.api.Descriptor.TopicCall
-import com.lightbend.lagom.javadsl.api.{ ServiceInfo, ServiceLocator }
 import com.lightbend.lagom.javadsl.api.broker.Subscriber
+import com.lightbend.lagom.javadsl.api.{ ServiceInfo, ServiceLocator }
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.compat.java8.FutureConverters._
 import scala.compat.java8.OptionConverters._
+import scala.concurrent.{ ExecutionContext, Future, Promise }
 
 /**
  * A Consumer for consuming messages from Kafka using the akka-stream-kafka API.

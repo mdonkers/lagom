@@ -3,7 +3,9 @@
  */
 package com.lightbend.lagom.javadsl.broker;
 
+import akka.Done;
 import akka.japi.Pair;
+import akka.stream.javadsl.Flow;
 import akka.stream.javadsl.Source;
 import com.lightbend.lagom.internal.broker.TaggedOffsetTopicProducer;
 import com.lightbend.lagom.javadsl.api.broker.Topic;
@@ -12,7 +14,10 @@ import com.lightbend.lagom.javadsl.persistence.AggregateEventTag;
 import com.lightbend.lagom.javadsl.persistence.Offset;
 import org.pcollections.PSequence;
 import org.pcollections.TreePVector;
+import play.libs.Scala;
+import scala.Option;
 
+import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
@@ -38,6 +43,12 @@ public final class TopicProducer {
         return taggedStreamWithOffset(SINGLETON_TAG, (tag, offset) -> eventStream.apply(offset));
     }
 
+    public static <Message> Topic<Message> singleStreamWithOffset(
+            Function<Offset, Source<Pair<Message, Offset>, ?>> eventStream,
+            Flow<akka.kafka.ProducerMessage.Result<?,Message,?>, akka.kafka.ProducerMessage.Result<?, Message, ?>, ?> readyFlow) {
+        return taggedStreamWithOffset(SINGLETON_TAG, (tag, offset) -> eventStream.apply(offset), readyFlow);
+    }
+
     private interface SingletonEvent extends AggregateEvent<SingletonEvent> {}
     private static final PSequence<AggregateEventTag<SingletonEvent>> SINGLETON_TAG = TreePVector.singleton(
             AggregateEventTag.of(SingletonEvent.class, "singleton")
@@ -59,7 +70,14 @@ public final class TopicProducer {
     public static <Message, Event extends AggregateEvent<Event>> Topic<Message> taggedStreamWithOffset(
             PSequence<AggregateEventTag<Event>> tags,
             BiFunction<AggregateEventTag<Event>, Offset, Source<Pair<Message, Offset>, ?>> eventStream) {
-        return new TaggedOffsetTopicProducer<>(tags, eventStream);
+        return new TaggedOffsetTopicProducer<>(tags, eventStream, Option.empty());
+    }
+
+    public static <Message, Event extends AggregateEvent<Event>> Topic<Message> taggedStreamWithOffset(
+            PSequence<AggregateEventTag<Event>> tags,
+            BiFunction<AggregateEventTag<Event>, Offset, Source<Pair<Message, Offset>, ?>> eventStream,
+            Flow<akka.kafka.ProducerMessage.Result<?, Message, ?>, akka.kafka.ProducerMessage.Result<?, Message, ?>, ?> readyFlow) {
+        return new TaggedOffsetTopicProducer<>(tags, eventStream, Option.apply(readyFlow.asScala()));
     }
 
 

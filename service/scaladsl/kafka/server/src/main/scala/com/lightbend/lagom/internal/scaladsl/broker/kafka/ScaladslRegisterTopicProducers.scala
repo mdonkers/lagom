@@ -61,7 +61,7 @@ class ScaladslRegisterTopicProducers(lagomServer: LagomServer, topicFactory: Top
                 }
 
                 Producer.startTaggedOffsetProducer(actorSystem, tags.map(_.tag), kafkaConfig, serviceLocator.locate,
-                  topicId.name, eventStreamFactory, partitionKeyStrategy,
+                  topicId.name, eventStreamFactory, partitionKeyStrategy, tagged.readyFlow,
                   new ScaladslKafkaSerializer(topicCall.messageSerializer.serializerForRequest),
                   offsetStore)
               case other => log.warn {

@@ -76,7 +76,7 @@ class JavadslRegisterTopicProducers @Inject() (resolvedServices: ResolvedService
                 }
 
                 Producer.startTaggedOffsetProducer(actorSystem, tags.map(_.tag), kafkaConfig, locateService,
-                  topicId.value(), eventStreamFactory, partitionKeyStrategy,
+                  topicId.value(), eventStreamFactory, partitionKeyStrategy, tagged.readyFlow,
                   new JavadslKafkaSerializer(topicCall.messageSerializer().serializerForRequest()),
                   offsetStore)
               case other => log.warn {

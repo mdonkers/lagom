@@ -42,13 +42,14 @@ private[lagom] object Producer {
     topicId:              String,
     eventStreamFactory:   (String, Offset) => Source[(Message, Offset), _],
     partitionKeyStrategy: Option[Message => String],
+    readyFlow:            Option[Flow[ProducerMessage.Result[_, Message, _], ProducerMessage.Result[_, Message, _], _]],
     serializer:           Serializer[Message],
     offsetStore:          OffsetStore
   )(implicit mat: Materializer, ec: ExecutionContext): Unit = {
 
     val producerConfig = ProducerConfig(system.settings.config)
     val publisherProps = TaggedOffsetProducerActor.props(kafkaConfig, locateService, topicId, eventStreamFactory,
-      partitionKeyStrategy, serializer, offsetStore)
+      partitionKeyStrategy, readyFlow, serializer, offsetStore)
 
     val backoffPublisherProps = BackoffSupervisor.propsWithSupervisorStrategy(
       publisherProps, s"producer", producerConfig.minBackoff, producerConfig.maxBackoff,
@@ -70,6 +71,7 @@ private[lagom] object Producer {
     topicId:              String,
     eventStreamFactory:   (String, Offset) => Source[(Message, Offset), _],
     partitionKeyStrategy: Option[Message => String],
+    readyFlow:            Option[Flow[ProducerMessage.Result[_, Message, _], ProducerMessage.Result[_, Message, _], _]],
     serializer:           Serializer[Message],
     offsetStore:          OffsetStore
   )(implicit mat: Materializer, ec: ExecutionContext) extends Actor with ActorLogging {
@@ -139,18 +141,19 @@ private[lagom] object Producer {
       Flow.fromGraph(GraphDSL.create(kafkaFlowPublisher(serviceLocatorUri)) { implicit builder => publishFlow =>
         import GraphDSL.Implicits._
         val unzip = builder.add(Unzip[Message, Offset])
-        val zip = builder.add(Zip[Any, Offset])
+        val zip = builder.add(Zip[ProducerMessage.Result[_, Message, _], Offset])
         val offsetCommitter = builder.add(Flow.fromFunction { e: (Any, Offset) =>
           offsetDao.saveOffset(e._2)
         })
+        val ready = builder.add(readyFlow.getOrElse(Flow.fromFunction { e: ProducerMessage.Result[String, Message, _] => e }))
 
-        unzip.out0 ~> publishFlow ~> zip.in0
+        unzip.out0 ~> publishFlow ~> ready ~> zip.in0
         unzip.out1 ~> zip.in1
         zip.out ~> offsetCommitter.in
         FlowShape(unzip.in, offsetCommitter.out)
       })
 
-    private def kafkaFlowPublisher(serviceLocatorUri: Option[URI]): Flow[Message, _, _] = {
+    private def kafkaFlowPublisher(serviceLocatorUri: Option[URI]): Flow[Message, ProducerMessage.Result[String, Message, _], _] = {
       def keyOf(message: Message): String = {
         partitionKeyStrategy match {
           case Some(strategy) => strategy(message)
@@ -158,11 +161,10 @@ private[lagom] object Producer {
         }
       }
 
-      Flow[Message].map { message =>
+      val msgFlow = Flow[Message].map { message =>
         ProducerMessage.Message(new ProducerRecord[String, Message](topicId, keyOf(message), message), NotUsed)
-      } via {
-        ReactiveProducer.flow(producerSettings(serviceLocatorUri))
       }
+      msgFlow.viaMat(ReactiveProducer.flow(producerSettings(serviceLocatorUri)))(Keep.right)
     }
 
     private def producerSettings(serviceLocatorUri: Option[URI]): ProducerSettings[String, Message] = {
@@ -187,10 +189,11 @@ private[lagom] object Producer {
       topicId:              String,
       eventStreamFactory:   (String, Offset) => Source[(Message, Offset), _],
       partitionKeyStrategy: Option[Message => String],
+      readyFlow:            Option[Flow[ProducerMessage.Result[_, Message, _], ProducerMessage.Result[_, Message, _], _]],
       serializer:           Serializer[Message],
       offsetStore:          OffsetStore
     )(implicit mat: Materializer, ec: ExecutionContext) =
       Props(new TaggedOffsetProducerActor[Message](kafkaConfig, locateService, topicId, eventStreamFactory,
-        partitionKeyStrategy, serializer, offsetStore))
+        partitionKeyStrategy, readyFlow, serializer, offsetStore))
   }
 }

@@ -574,9 +574,13 @@ object Dependencies {
     "org.hibernate" % "hibernate-core" % "5.2.5.Final" % Test
   )
 
-  val `broker-javadsl` = libraryDependencies ++= Nil
+  val `broker-javadsl` = libraryDependencies ++= Seq(
+    akkaStreamKafka
+  )
 
-  val `broker-scaladsl` = libraryDependencies ++= Nil
+  val `broker-scaladsl` = libraryDependencies ++= Seq(
+    akkaStreamKafka
+  )
 
   val `kafka-client` = libraryDependencies ++= Seq(
     "org.slf4j" % "log4j-over-slf4j" % Slf4jVersion,
